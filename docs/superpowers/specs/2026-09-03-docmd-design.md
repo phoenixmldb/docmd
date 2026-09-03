@@ -153,6 +153,8 @@ Consequences:
 
 - **No conversion timestamp in frontmatter.** `--stamp` is available for callers who explicitly
   want one.
+- **No audit or diagnostic data in the `.md`** — see §9.3. Anything in frontmatter is part of the
+  file's hash, so diagnostics that improve between releases would force needless corpus re-embedding.
 - Stable ordering everywhere; deterministic asset names.
 - Culture-invariant formatting. Dates are ISO-8601; numbers are invariant. Tests run under
   `de-DE` and `tr-TR` as well as the default culture.
@@ -229,12 +231,14 @@ worth mapping instead of guessing.
 
 ## 9. Corpus audit
 
+### 9.1 The run-level report
+
 ```
 docmd audit <path> [-r] [--report audit.json] [--style-map <file>]
 ```
 
-Runs stages 1–3 and stops before emission: fast, writes nothing. `--report` on the convert path
-produces the same structure, so every batch conversion reports what it saw.
+Runs stages 1–3 and stops before emission: fast, writes nothing by default. `--report` on the
+convert path produces the same structure, so every batch conversion reports what it saw.
 
 Collected per document and aggregated:
 
@@ -256,6 +260,52 @@ Collected per document and aggregated:
 
 This tells a customer which documents will retrieve badly **before** they pay to embed them.
 `--strict` turns any degradation into a non-zero exit for CI.
+
+### 9.2 Per-document sidecar
+
+`--audit-sidecar` additionally writes one `<stem>.audit.json` beside each converted document,
+joining the existing naming family:
+
+```
+out/
+├── report.md
+├── report.review.html      # --review
+├── report.audit.json       # --audit-sidecar
+└── img/report/…
+```
+
+The sidecar record is **the same object** that appears in the run-level report's array — one schema,
+one serialiser — so this is a small addition rather than a second feature. Both may be produced in
+the same run.
+
+The standalone `docmd audit` command writes sidecars **only when given `-o`**. Scattering
+`.audit.json` files through a customer's source document tree uninvited is obnoxious, and the audit
+command's default of writing nothing is deliberate.
+
+Free tier. It is a local file, and it is the diagnostic that makes the product useful to someone who
+has not yet decided to buy anything.
+
+### 9.3 Audit data never enters the Markdown
+
+Audit output is a sidecar and **never** appears in frontmatter or document body. This is a
+determinism requirement, not a stylistic preference.
+
+Frontmatter is inside the `.md` and therefore part of its content hash. If audit data lived there,
+shipping an improved direct-formatting heuristic would change every document's audit block, change
+every file's hash, and cause every pipeline watching for content change to **re-embed an entire
+corpus whose text did not change** — a real and pointless bill at a few thousand documents.
+
+A sidecar has the opposite property: `report.md` stays byte-identical across docmd versions unless
+the *conversion* changed, while `report.audit.json` is free to improve every release. The two
+artifacts version independently, which is what is wanted when one is a corpus and the other is
+diagnostics about it.
+
+Secondly, frontmatter is frequently indexed. "This document used 3 unmapped styles" would become
+tokens competing at retrieval time with the text it describes.
+
+The tempting middle path — a small "structure quality" summary field in frontmatter with detail in
+the sidecar — is **rejected**: that field derives from the same heuristics, so it reintroduces the
+whole re-embedding problem for one line of text.
 
 ## 10. Output destinations
 
@@ -359,10 +409,11 @@ docmd <input> [options]                # .docx/.docm/.dotx/.dotm, or a directory
       --front-matter <mode>  yaml | none                   (default: yaml)
       --stamp                include a conversion timestamp (breaks determinism)
       --strict               degradations become a non-zero exit
-      --report <file>        write the conversion report as JSON
+      --report <file>        write the run-level audit report as JSON
+      --audit-sidecar        also write <stem>.audit.json per document
   -q, --quiet   -v, --verbose
 
-docmd audit <path> [-r] [--report <file>]
+docmd audit <path> [-r] [--report <file>] [-o <dir> --audit-sidecar]
 docmd register --email <addr> | --key <key>
 docmd license                          # show current licence status
 ```
@@ -404,6 +455,9 @@ cell, a `#` at line start inventing a heading, a `_` in a filename italicising a
 ### 13.3 Other required tests
 
 - **Determinism:** convert twice, assert byte-identical; repeat under `de-DE` and `tr-TR`.
+- **Audit isolation:** converting with and without `--audit-sidecar` produces a byte-identical
+  `.md`. This pins §9.3 directly — the guarantee is that diagnostics can never perturb the corpus,
+  and it is only a guarantee if a test fails when someone adds a helpful field to the frontmatter.
 - **Golden files** for whole documents, with the composite XML dumped on failure so a break
   localises to a stage.
 - **Licence gate negatives:** a token that verifies under the engine key but carries the wrong
