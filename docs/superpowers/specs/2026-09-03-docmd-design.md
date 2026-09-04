@@ -1,7 +1,7 @@
 # docmd — design
 
 **Date:** 2026-09-03
-**Status:** Agreed. Open commercial items in §16.
+**Status:** Agreed. Repositioned to open core on 2026-09-04 — see §2, §10.3 and §11.
 **Scope:** `docmd`, a commercial .NET CLI converting OOXML Word documents to Markdown, and the
 shared core that a companion `pptmd` tool will reuse.
 **Not in scope:** `pptmd`'s own conversion design; the standalone licensing project (tabled —
@@ -24,17 +24,45 @@ technical fit and the commercial reason this product is ours to build.
 
 ## 2. Position
 
-`docmd` is a **commercial product in a private repository**. It is not part of the Apache-2.0
-engine estate and must never be described as though it were.
+`docmd`'s **core conversion is open source under Apache-2.0**, alongside the engine estate rather
+than apart from it. The commercial layer sits above it, not inside it.
 
-- Free for individuals and developers, but **registration is required** — accepting terms is the
-  gate.
-- **Commercial use requires a commercial licence.** Note this is a *different line* from the
-  database engine's model (`phoenixml/docs/superpowers/specs/2026-07-31-licensing-model-design.md`
-  §4), which permits free commercial use below a revenue/team threshold. docmd's terms must not
-  imply the engine's, and vice versa.
-- A technical paygate exists at **cloud output** (§10) and coincides closely with the point at
-  which use becomes organisational.
+This reverses the original position (a private commercial product with registration and a paygate
+at cloud output), and the reason is worth recording because it was not obvious at the outset.
+
+**The core competes with free.** Microsoft's MarkItDown converts fifteen-plus formats to Markdown,
+is MIT-licensed, and is the default answer when someone asks how to get a document into a RAG
+index. Charging for `.docx` → Markdown means charging for the half of the product that has a free
+substitute from the largest vendor in the market, while the price a buyer will accept is anchored to
+the perceived job — "it converts files" — rather than to the work.
+
+**The core is also the best argument for the engine.** A conformance percentage persuades nobody;
+a stylesheet that recovers heading structure Microsoft's own tool loses is concrete, readable, and
+sits in a public repository. Giving it away buys distribution and credibility that a private repo
+cannot.
+
+**Open also invites work we would not do ourselves.** An extensible core lets someone build a review
+artifact or an audit shaped differently from ours; each of those is a reason to adopt the core, and
+the people who would rather buy than build are the commercial customers.
+
+### The split
+
+| Layer | Licence | Status |
+|---|---|---|
+| Core conversion — OPC reader, composite, stylesheets, serialiser, CLI | **Apache-2.0** | shipping |
+| Review companion (§7.2) — comments and tracked changes as a portable artifact | commercial | not started |
+| Corpus audit (§9) — what a customer's corpus actually contains | commercial | not started |
+| Cloud sinks (§10) — Pixault and object storage, with credentials and manifests | commercial | not started |
+
+The commercial layer lives in a **separate private repository consuming the core as a NuGet
+package**, matching how every repo in this workspace already consumes its siblings. A plugin
+boundary inside this repo was the alternative and is rejected: it would put commercial strategy back
+into a public repo, which is the exact problem this change exists to remove.
+
+**Sequencing:** build the corpus audit before the review companion. It is the smaller build — the
+data already flows through the pipeline — and it is the one that can be put in front of a prospect
+with their own documents. It is therefore the cheapest test of whether the commercial half of this
+split is real, which is the assumption everything above rests on.
 
 The product's value is not converting one document — that is a commodity. It is converting a
 **corpus** identically, reproducibly, with provenance, on a schedule, and telling the customer what
@@ -47,26 +75,26 @@ their corpus actually contains before they spend money embedding it.
 | 1 | **OOXML family only** — `.docx`, `.docm`, `.dotx`, `.dotm` | `.doc` is CFBF binary with no XML; supporting it shares zero code with the XSLT path and is the largest single effort cliff available. A `.doc` gets a clear "re-save as .docx" error and exit 2. |
 | 2 | **Markdown + YAML frontmatter** as the primary output | Understood by both RAG indexers and static site generators; one artifact serves both audiences with no mode switch. |
 | 3 | **A self-contained HTML companion** for comments and tracked changes | Redline view plus a summary header. Answers "how did this document get here, and what is still contested" — a question the Markdown deliberately does not answer. |
-| 4 | **Register to run, then never block** | Registration is the consent moment. After that the free path never blocks for any licensing reason. |
+| 4 | ~~Register to run, then never block~~ — **superseded 2026-09-04 by §2.** | The core is Apache-2.0 and carries no licensing code. Kept struck through rather than deleted because the removal is a decision a future maintainer might undo without knowing it was made. |
 | 5 | **Style map file with a stylesheet escape hatch** | Customers map house styles declaratively; XSLT remains available for full control. |
-| 6 | **One private repo** holding `docmd` and later `pptmd` | They share a core, a licence scheme, and a cadence. Splitting them would mean publishing the shared core as a package to consume it next door — the pin-drift failure `phoenixml/CLAUDE.md` documents across this workspace. |
+| 6 | **One repo** holding `docmd` and later `pptmd` | They share a core and a cadence. Splitting them would mean publishing the shared core as a package to consume it next door — the pin-drift failure `phoenixml/CLAUDE.md` documents across this workspace. The commercial layer is the one thing that *does* live separately (§2), because it is the only part with a different licence. |
 | 7 | **Corpus audit as a first-class command** | The data already flows through the pipeline; aggregating it is the highest value per line of code in the design. |
-| 8 | **Cloud output is the paid tier; Pixault is the launch paid sink** | Pixault is the sink a customer cannot replace with `aws s3 sync`, so the paywall sits on genuine value. |
+| 8 | **Cloud sinks are the commercial layer; Pixault is the launch sink** | Pixault is the sink a customer cannot replace with `aws s3 sync`, so the commercial line sits on genuine work. It needs no gate in the core: a sink is a separate package implementing `IAssetSink`, so the seam is the boundary (§10.3). |
 
 ## 4. Architecture
 
 ### 4.1 Repository and projects
 
-New private repo at `/repos/phoenixml/docmd`. House conventions apply: `net10.0`,
+Repo at `/repos/phoenixml/docmd`, public under Apache-2.0 (§2). House conventions apply: `net10.0`,
 `LangVersion=preview`, nullable enabled, `TreatWarningsAsErrors=true` with `AnalysisLevel=latest-all`,
 Central Package Management, xunit v3, `Directory.Build.rsp` carrying `-nodeReuse:false`.
 
 | Project | Ships in | Role |
 |---|---|---|
-| `src/Ooxml.Md.Core` | both tools | OPC/ZIP opening, relationship resolution, composite-assembly framework, md-XML model and Markdown serialiser, frontmatter, image extraction, style-map machinery, asset sinks, licence gate |
+| `src/Ooxml.Md.Core` | both tools | OPC/ZIP opening, relationship resolution, composite-assembly framework, md-XML model and Markdown serialiser, frontmatter, image extraction, style-map machinery, asset sinks |
 | `src/Docmd.Word` | docmd | WordprocessingML assembly + `markdown.xslt` / `review.xslt` |
-| `src/Docmd.Cli` | docmd | `PackAsTool`, `ToolCommandName=docmd`, argument parsing, console UX, licence gate invocation |
-| `tests/Ooxml.Md.Core.Tests` | — | serialiser, sinks, licence gate |
+| `src/Docmd.Cli` | docmd | `PackAsTool`, `ToolCommandName=docmd`, argument parsing, console UX |
+| `tests/Ooxml.Md.Core.Tests` | — | serialiser, sinks |
 | `tests/Docmd.Word.Tests` | — | golden-file conversion |
 | *(later)* `src/Pptmd.Presentation`, `src/Pptmd.Cli` | pptmd | PresentationML assembly + stylesheets |
 
@@ -333,9 +361,9 @@ them; `--img-dir` renames the folder.
 silent pass-through produces a broken image on every viewer. Native **charts** are `chart1.xml`
 DrawingML parts, not images, and often have no raster fallback; they are reported, not fabricated.
 
-### 10.3 Free versus paid
+### 10.3 What ships open, and what does not
 
-| | Free (after registration) | Paid |
+| | Open core | Commercial layer |
 |---|---|---|
 | Filesystem output | ✅ | |
 | `--asset-base-url <url>` | ✅ | |
@@ -343,10 +371,13 @@ DrawingML parts, not images, and often have no raster fallback; they are reporte
 | *(later)* S3 / Azure Blob sinks | | ✅ |
 
 `--asset-base-url` writes assets locally and emits remote URLs, so the customer's existing
-`aws s3 sync` / `azcopy` step moves the bytes. It stays **free deliberately**: it is string
-concatenation a customer replaces with `sed` in a minute, and gating it would earn nothing while
-inviting resentment. The paywall sits where docmd does real work — upload, credentials, retries,
-manifests, idempotency, DAM metadata.
+`aws s3 sync` / `azcopy` step moves the bytes. It belongs in the open core: it is string
+concatenation a customer replaces with `sed` in a minute, and there is nothing to sell in it.
+
+The commercial sinks are where docmd does real work — upload, credentials, retries, manifests,
+idempotency, DAM metadata — and, being separate packages implementing `IAssetSink`, they need no
+gate in the core. The seam *is* the boundary. That is a better arrangement than the entitlement
+check it replaces: nothing in the open code has to know a commercial layer exists.
 
 The `.md` files themselves are **not** sent to a DAM. They are a corpus's source of truth and want
 versioning, diffing and incremental re-indexing, which git and object storage do well and a DAM does
@@ -354,40 +385,46 @@ not. The `.review.html` companion is a shareable document artifact and may sensi
 
 ## 11. Licensing
 
-The mechanism is **tabled** pending a standalone licensing project owned by a separate workstream.
-docmd isolates it behind one seam so adoption later is a one-file change:
+**The core carries no licensing code at all.** `ILicenseGate`, `PermissiveLicenseGate` and exit
+code 3 were removed when docmd became open core (2026-09-04); there is nothing to register for and
+nothing here to gate.
 
-```csharp
-public interface ILicenseGate { LicenseStatus Check(); }
-public sealed record LicenseStatus(bool Allowed, string? Notice, LicenseClaims? Claims);
-```
+This section is kept rather than deleted because the reasoning was load-bearing and the decision it
+records is one a future maintainer may be tempted to reverse.
 
-Called once in `Program.Main` before any conversion work. No converter code references it.
+### 11.1 Why the gate is gone rather than completed
 
-### 11.1 Compatibility contract
+The original design put a registration gate in `Program`, isolated behind one interface so a real
+verifier could be swapped in later. That seam was well built and is now dead weight: under
+Apache-2.0 the core has no entitlement to check, and a placeholder that allows every run is a
+release hazard — it looks like enforcement and is not.
 
-Whatever the shared project lands, these must hold:
+Removing it also removed the work behind it: no key issuance, no portal integration, no terms.
 
-1. **Stateless, offline verification.** Public key plus token, no database, no network. In
-   particular **no dependency on `PhoenixmlDb.Storage`**, whose `LicenseReader` lives behind
-   `LightningDB`, `PhoenixmlDb.Core` and `PhoenixmlDb.XQuery` — a Word converter must not ship an
-   embedded database to check a 700-byte JWT.
-2. **Audience-scoped tokens.** The token `LicenseService` emits today carries `sub`, `plan`, `iat`,
-   `exp`, `features` and **no `aud` claim**, so any verifier holding the `2026-09` public key
-   accepts any licence that key ever signed. docmd must reject a token that merely verifies but was
-   not issued for docmd. **This negative case must be tested.**
-3. **Register to run, then never block** on the free path.
-4. **Resolution order:** `--license-key` → `DOCMD_LICENSE` → `~/.config/docmd/license`. The config
-   file is deliberately reinstated relative to the engine's delivery spec: that spec removed files
-   because an embedded library has no meaningful home directory, whereas for a CLI `~/.config/` is
-   the correct and conventional location — `gh`, `aws` and `dotnet` all behave this way.
+### 11.2 If the commercial layer needs entitlement
 
-### 11.2 Failure posture
+The commercial packages live in their own repository and may verify however they choose. Two
+constraints from the original analysis still hold and are worth carrying across:
 
-**The free path fails open; the paid path fails closed.** Core conversion never stops for any
-licensing reason — expired, unverifiable, offline, clock skew all degrade to a stderr notice. A paid
-sink requires a *positive* entitlement assertion, because "cannot verify, so proceed" is the gate
-not existing. `LicenseStatus` therefore carries entitlements drawn from token claims.
+1. **Stateless, offline verification.** A signed token needs a public key and nothing else — no
+   database, no network call. In particular, nothing should depend on `PhoenixmlDb.Storage`, whose
+   `LicenseReader` sits behind `LightningDB`, `PhoenixmlDb.Core` and `PhoenixmlDb.XQuery`; a
+   converter must not ship an embedded database to check a 700-byte JWT.
+2. **Audience-scoped tokens.** The portal's token carries `sub`, `plan`, `iat`, `exp`, `features`
+   and **no `aud` claim**, so any verifier holding the `2026-09` public key accepts any licence that
+   key ever signed — including one issued for a different product entirely. Any verifier must reject
+   a token that merely verifies. That negative case must be tested.
+
+### 11.3 The timing argument, recorded
+
+This change was cheap because nothing had shipped and nobody had registered a key. Going open
+*after* selling licences would have been a rug-pull, and the engine's own licensing analysis is
+emphatic that the .NET community punishes rug-pulls far more reliably than it punishes prices — Moq
+changed no licence at all and was excoriated for harvesting emails; MassTransit went fully
+commercial and was received without incident.
+
+Apache-2.0 on this version does not bind the next one. What it forecloses is charging for what has
+already been given away — which is the half that had a free substitute regardless.
 
 ## 12. CLI surface
 
@@ -425,9 +462,11 @@ docmd license                          # show current licence status
 | 0 | Success |
 | 1 | Unexpected internal error |
 | 2 | Bad input — not OOXML, corrupt package, path not found |
-| 3 | Not registered |
-| 4 | Completed with degradations, under `--strict` |
-| 5 | Paid feature requested without entitlement |
+| 4 | Completed with degradations, under `--strict` — reserved, not yet reachable |
+
+Codes **3** (not registered) and **5** (paid feature without entitlement) were retired with the
+registration model in §11. They are not reused: a released tool's exit codes are a contract, and
+renumbering around a hole is worse than leaving one.
 
 ## 13. Testing
 
@@ -490,14 +529,16 @@ discretionary.
 
 ## 16. Open items
 
-- **The exact free/commercial line.** "Commercial use requires a commercial licence" is materially
-  different from the engine's revenue/team threshold. Needs settling in terms before launch, and
-  must not be baked into code.
-- **Whether docmd and pptmd are one entitlement or two.** Affects the audience claim's shape.
-- **Pixault's API surface** — not represented in this workspace. The sink cannot be built until it is
-  known.
-- **Sequencing:** no paid sink can ship before the entitlement mechanism exists. Free tier is
-  therefore the first shippable milestone.
+- ~~The exact free/commercial line~~ — **closed** by §2. The core is Apache-2.0; the commercial
+  layer is the review companion, the corpus audit and the cloud sinks.
+- ~~Whether docmd and pptmd are one entitlement or two~~ — **closed**. Both cores are open;
+  entitlement, if any, belongs to the commercial repository.
+- **Pixault's API surface** — not represented in this workspace. The sink cannot be built until it
+  is known.
+- **Sequencing:** build the corpus audit before the review companion (§2). It is the smaller build
+  and the cheapest test of whether the commercial layer is real.
+- **Where the commercial repository lives**, and whether `pptmd`'s core ships from this repo or its
+  own.
 - **Table handling for RAG.** Emitting correct GFM is right, but a pipe table chunked at 512 tokens
   loses its header row. Whether docmd offers row-flattening or per-table chunk hints is deferred, and
   marketing should not imply tables are a solved problem.
@@ -507,6 +548,7 @@ discretionary.
 - `.doc`, `.rtf`, `.odt` — see §3, decision 1.
 - Rendering EMF/WMF or native charts to raster. Reported, never fabricated.
 - Sending `.md` files to a DAM — see §10.3.
+- Any licensing, registration or entitlement code in this repository — see §11.
 - `pptmd`'s conversion design. The core is structured for it; the tool is a separate effort.
 - Any runtime telemetry, machine fingerprinting, or identity collection. The licensing model design's principle 5 ("No telemetry about human identity. Ever.")
   applies here without exception.

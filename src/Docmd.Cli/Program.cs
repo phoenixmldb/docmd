@@ -2,7 +2,6 @@ namespace Docmd.Cli;
 
 using System.Diagnostics;
 using Docmd.Word;
-using Ooxml.Md.Core.Licensing;
 using Ooxml.Md.Core.Opc;
 
 internal static class Program
@@ -10,33 +9,24 @@ internal static class Program
     private const int ExitSuccess = 0;
     private const int ExitInternalError = 1;
     private const int ExitBadInput = 2;
-    private const int ExitNotRegistered = 3;
 
-    // Spec §12 defines these two codes, but nothing in this plan produces a degradation
-    // report under --strict or gates a paid sink -- both are later work. Defined here so the
-    // exit-code contract is complete and the numbers are reserved; deliberately unreferenced
-    // rather than wired to a fake path that would return them for the wrong reason.
-#pragma warning disable CA1823 // reserved exit codes -- see comment above; no reachable path yet by design
+    // Spec §12 reserves 4 for a degradation report under --strict, which is later work.
+    // Defined so the exit-code contract is complete and the number is reserved; deliberately
+    // unreferenced rather than wired to a fake path that would return it for the wrong reason.
+    // Codes 3 (not registered) and 5 (paid feature) were retired when docmd became open core:
+    // there is nothing to register for and nothing here to gate.
+#pragma warning disable CA1823 // reserved exit code -- see comment above; no reachable path yet by design
     private const int ExitDegradedUnderStrict = 4;
-    private const int ExitPaidFeatureRequired = 5;
 #pragma warning restore CA1823
 
-    internal static Task<int> Main(string[] args) => Run(args, new PermissiveLicenseGate());
+    internal static Task<int> Main(string[] args) => Run(args);
 
     /// <summary>
-    /// The whole program, with the licence gate supplied rather than constructed.
+    /// The whole program, kept separate from <see cref="Main"/> so the exit-code contract can
+    /// be exercised from a test rather than only from a shell.
     /// </summary>
-    /// <remarks>
-    /// Exit code 3 (not registered) is part of the published contract, and with the gate
-    /// built inside Main it was unreachable from a test: the only implementation that
-    /// exists allows every run. Taking the gate as a parameter makes the refusal path
-    /// testable now, and makes swapping in the real verifier (spec §11) a change at one
-    /// call site rather than an edit to the program's body.
-    /// </remarks>
-    internal static async Task<int> Run(string[] args, ILicenseGate gate)
+    internal static async Task<int> Run(string[] args)
     {
-        ArgumentNullException.ThrowIfNull(gate);
-
         var parsed = CommandLine.Parse(args);
 
         if (parsed.Error is not null)
@@ -71,18 +61,6 @@ internal static class Program
                 return ExitBadInput;
             default:
                 break;
-        }
-
-        // The gate is consulted once, before any work.
-        var status = gate.Check();
-        if (status.Notice is not null)
-        {
-            await Console.Error.WriteLineAsync(status.Notice).ConfigureAwait(false);
-        }
-
-        if (!status.Allowed)
-        {
-            return ExitNotRegistered;
         }
 
         // IsNullOrWhiteSpace, not `is null`: `docmd ""` reached DocumentConverter, whose
