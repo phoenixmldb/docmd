@@ -7,9 +7,13 @@ using Xunit;
 
 public sealed class MarkdownSerializerTests
 {
+    // PreserveWhitespace, matching MarkdownTransform: the serialiser's real input keeps
+    // whitespace-only text nodes, and a test helper that silently drops them cannot
+    // express -- let alone pin -- what the serialiser does with a space.
     private static string Serialize(string inner)
         => MarkdownSerializer.Serialize(XDocument.Parse(
-            $"""<md:document xmlns:md="https://phoenixml.dev/docmd/md">{inner}</md:document>"""));
+            $"""<md:document xmlns:md="https://phoenixml.dev/docmd/md">{inner}</md:document>""",
+            LoadOptions.PreserveWhitespace));
 
     [Fact]
     public void Heading_UsesHashesForItsLevel()
@@ -119,9 +123,47 @@ public sealed class MarkdownSerializerTests
             .Should().Be("Run: `ls -la `\n");
 
     [Fact]
+    public void Strong_WithATrailingSpace_PutsTheSpaceOutsideTheDelimiters()
+        // CommonMark closes an emphasis run only when the closing delimiter is
+        // right-flanking. "**bold **and more" is therefore not bold at all -- it renders
+        // as literal asterisks. Selecting a word together with its trailing space before
+        // pressing Ctrl+B is everyday Word behaviour, so this arrives constantly.
+        => Serialize("""<md:para><md:strong><md:text>bold </md:text></md:strong><md:text>and more</md:text></md:para>""")
+            .Should().Be("**bold** and more\n");
+
+    [Fact]
+    public void Em_WithALeadingSpace_PutsTheSpaceOutsideTheDelimiters()
+        // The opening delimiter has the mirror-image requirement: it must be
+        // left-flanking, so "see* note*" is not italic either.
+        => Serialize("""<md:para><md:text>see</md:text><md:em><md:text> note</md:text></md:em></md:para>""")
+            .Should().Be("see *note*\n");
+
+    [Fact]
+    public void Strong_WithSpacesOnBothSides_KeepsBothOutside()
+        => Serialize("""<md:para><md:text>a</md:text><md:strong><md:text> bold </md:text></md:strong><md:text>b</md:text></md:para>""")
+            .Should().Be("a **bold** b\n");
+
+    [Fact]
+    public void Strong_ContainingOnlyWhitespace_EmitsNoDelimitersAtAll()
+        // "**" around nothing is four literal asterisks in the reader's face, and an
+        // emphasis with no content has no meaning to lose by dropping it.
+        => Serialize("""<md:para><md:text>a</md:text><md:strong><md:text> </md:text></md:strong><md:text>b</md:text></md:para>""")
+            .Should().Be("a b\n");
+
+    [Fact]
     public void Blockquote_PrefixesEveryLine()
         => Serialize("""<md:blockquote><md:para><md:text>Caution.</md:text></md:para></md:blockquote>""")
             .Should().Be("> Caution.\n");
+
+    [Fact]
+    public void Blockquote_BlankSeparatorLineCarriesABareMarker()
+        // The separator between two paragraphs of one quote used to be "> " -- a trailing
+        // space, invisible, stripped by any editor that trims on save (which makes a
+        // re-conversion look like a diff against nothing) and one keystroke away from
+        // being a hard break. It cannot simply be blank the way a list item's separator
+        // is: an empty line TERMINATES a blockquote, splitting one quote into two.
+        => Serialize("""<md:blockquote><md:para><md:text>A</md:text></md:para><md:para><md:text>B</md:text></md:para></md:blockquote>""")
+            .Should().Be("> A\n>\n> B\n");
 
     [Fact]
     public void CodeBlock_UsesFencesAndCarriesItsLanguage()
@@ -155,6 +197,18 @@ public sealed class MarkdownSerializerTests
             </md:list>
             """)
             .Should().Be("- One\n- Two\n");
+
+    [Fact]
+    public void EmptyListItem_KeepsItsMarkerButNotTheSpaceAfterIt()
+        // The marker must stay -- dropping it would delete the item -- but "- " on an
+        // otherwise blank line is trailing whitespace. "-" alone is a valid empty item.
+        => Serialize("""<md:list ordered="false"><md:item/><md:item><md:para><md:text>Two</md:text></md:para></md:item></md:list>""")
+            .Should().Be("-\n- Two\n");
+
+    [Fact]
+    public void EmptyOrderedListItem_KeepsItsNumberButNotTheSpaceAfterIt()
+        => Serialize("""<md:list ordered="true"><md:item/><md:item><md:para><md:text>Two</md:text></md:para></md:item></md:list>""")
+            .Should().Be("1.\n2. Two\n");
 
     [Fact]
     public void ListItem_WithMultipleBlocks_LeavesBlankSeparatorLinesEmpty()

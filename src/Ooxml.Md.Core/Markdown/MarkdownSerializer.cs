@@ -89,7 +89,14 @@ public static class MarkdownSerializer
             WriteBlocks(inner, block.Elements(), options, indent: "");
             foreach (var line in inner.ToString().TrimEnd('\n').Split('\n'))
             {
-                builder.Append(indent).Append("> ").Append(line).Append(Newline);
+                // The blank line separating two paragraphs of one quote gets a bare '>'
+                // rather than "> ": the space is invisible, is trailing whitespace an
+                // editor or linter will strip on save (making a re-conversion look like a
+                // diff against nothing), and two of them would be a hard break. Unlike a
+                // list item -- where WriteList drops the prefix entirely on a blank line --
+                // the marker itself must stay: a genuinely empty line TERMINATES a
+                // blockquote in CommonMark, splitting one quote into two.
+                builder.Append(indent).Append(line.Length == 0 ? ">" : "> " + line).Append(Newline);
             }
         }
         else if (block.Name == MdNames.CodeBlock)
@@ -134,15 +141,11 @@ public static class MarkdownSerializer
             }
             else if (element.Name == MdNames.Strong)
             {
-                builder.Append("**");
-                WriteInline(builder, element.Nodes(), options);
-                builder.Append("**");
+                WriteEmphasis(builder, element, options, "**");
             }
             else if (element.Name == MdNames.Em)
             {
-                builder.Append('*');
-                WriteInline(builder, element.Nodes(), options);
-                builder.Append('*');
+                WriteEmphasis(builder, element, options, "*");
             }
             else if (element.Name == MdNames.Code)
             {
@@ -170,6 +173,42 @@ public static class MarkdownSerializer
                 builder.Append("  ").Append(Newline);
             }
         }
+    }
+
+    /// <summary>
+    /// Writes an emphasis span with its delimiters moved inside any surrounding
+    /// whitespace.
+    /// </summary>
+    /// <remarks>
+    /// CommonMark only closes an emphasis run when the closing delimiter is
+    /// right-flanking, i.e. not preceded by whitespace. "**bold **and more" therefore
+    /// renders as literal asterisks, not bold -- confirmed against Markdig. Selecting a
+    /// word together with its trailing space before pressing Ctrl+B is everyday Word
+    /// behaviour, so the span arriving here with an outer space on one or both sides is
+    /// the common case, not a malformed one. Emitting the whitespace outside the
+    /// delimiters preserves both the words and their spacing while keeping the emphasis.
+    /// A span that is nothing but whitespace gets no delimiters at all: "****" is four
+    /// literal asterisks, and an empty emphasis carries no meaning to drop.
+    /// </remarks>
+    private static void WriteEmphasis(StringBuilder builder, XElement element, MarkdownOptions options, string delimiter)
+    {
+        var inner = new StringBuilder();
+        WriteInline(inner, element.Nodes(), options);
+        var text = inner.ToString();
+
+        var trimmed = text.Trim();
+        if (trimmed.Length == 0)
+        {
+            builder.Append(text);
+            return;
+        }
+
+        var leadingLength = text.Length - text.TrimStart().Length;
+        builder.Append(text, 0, leadingLength)
+               .Append(delimiter)
+               .Append(trimmed)
+               .Append(delimiter)
+               .Append(text, leadingLength + trimmed.Length, text.Length - leadingLength - trimmed.Length);
     }
 
     /// <summary>
@@ -249,7 +288,12 @@ public static class MarkdownSerializer
                 string prefix;
                 if (i == 0)
                 {
-                    prefix = indent + marker;
+                    // An empty item still needs its marker -- dropping it would delete the
+                    // item -- but not the space after it, which is trailing whitespace on
+                    // an otherwise blank line. "-" and "1." are both valid empty items.
+                    prefix = lines[i].Length == 0
+                        ? indent + marker.TrimEnd(' ')
+                        : indent + marker;
                 }
                 else if (lines[i].Length == 0)
                 {
