@@ -15,9 +15,10 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Docmd.Word/Docmd.Word.csproj" />
-    <!-- CommandLineTests exercises Docmd.Cli's parser directly (Task 13). CommandLine and
-         ParseResult are public rather than InternalsVisibleTo: the CLI is not a library API
-         anyone else consumes. -->
+    <!-- CommandLineTests exercises Docmd.Cli's parser directly (Task 13). CommandLine,
+         ParseResult and CommandKind stay internal; Docmd.Cli's AssemblyInfo.cs grants this
+         assembly access via InternalsVisibleTo rather than widening the Exe project's public
+         surface (CA1515) for types nobody outside this test project consumes. -->
     <ProjectReference Include="../../src/Docmd.Cli/Docmd.Cli.csproj" />
   </ItemGroup>
   <ItemGroup>

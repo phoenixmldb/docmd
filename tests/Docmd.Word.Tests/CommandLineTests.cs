@@ -55,6 +55,10 @@ public sealed class CommandLineTests
     public void Parse_RejectsAnUnknownFlavour()
         => CommandLine.Parse(["report.docx", "--flavour", "textile"]).Error.Should().Contain("textile");
 
+    [Fact]
+    public void Parse_RejectsAnUnknownFrontMatterMode()
+        => CommandLine.Parse(["report.docx", "--front-matter", "toml"]).Error.Should().Contain("toml");
+
     // Ruling 19 follow-through: the CLI must validate --asset-base-url with
     // Uri.TryCreate(raw, UriKind.Absolute, ...) so a malformed value fails here -- mapped by
     // Program to exit code 2 -- rather than surviving to FileSystemAssetSink deep in the

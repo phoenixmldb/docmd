@@ -3,9 +3,9 @@ namespace Docmd.Cli;
 using Docmd.Word;
 using Ooxml.Md.Core.Markdown;
 
-public enum CommandKind { Convert, Audit, Register, License, Help, Version }
+internal enum CommandKind { Convert, Audit, Register, License, Help, Version }
 
-public sealed record ParseResult(
+internal sealed record ParseResult(
     CommandKind Command,
     string? Input,
     ConversionOptions? Options,
@@ -19,9 +19,9 @@ public sealed record ParseResult(
 /// System.CommandLine's API has moved repeatedly across previews, and a churning
 /// dependency is a liability in a commercial product. Fifteen flags do not justify it.
 /// </remarks>
-public static class CommandLine
+internal static class CommandLine
 {
-    public static ParseResult Parse(string[] args)
+    internal static ParseResult Parse(string[] args)
     {
         ArgumentNullException.ThrowIfNull(args);
 

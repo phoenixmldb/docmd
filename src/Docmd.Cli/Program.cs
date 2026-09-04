@@ -54,12 +54,15 @@ internal static class Program
                 break;
         }
 
-        // The gate is consulted once, before any work. Its implementation is a seam;
-        // what matters here is that the answer is honoured. `var` (rather than an explicit
-        // ILicenseGate annotation) keeps the swap to the real verifier a one-line change --
-        // replacing the constructor call -- without paying for an interface dispatch on a
-        // call site that runs exactly once per invocation.
-        var gate = new PermissiveLicenseGate();
+        // The gate is consulted once, before any work. Its implementation is a seam; typing
+        // the local as ILicenseGate (not `var`) keeps that seam compiler-checked at the exact
+        // call site where it matters -- a future RealLicenseGate that forgot to implement the
+        // interface would fail to compile here, not just wherever it happens to be assigned.
+        // CA1859 would rather this be the concrete PermissiveLicenseGate for a marginally
+        // cheaper dispatch; that trade is not worth it on a call site invoked once per run.
+#pragma warning disable CA1859 // interface-typed on purpose -- see comment above
+        ILicenseGate gate = new PermissiveLicenseGate();
+#pragma warning restore CA1859
         var status = gate.Check();
         if (status.Notice is not null)
         {
@@ -116,6 +119,18 @@ internal static class Program
             await Console.Error.WriteLineAsync($"docmd: {ex.Message}").ConfigureAwait(false);
             return ExitBadInput;
         }
+        // Final backstop, not a substitute for the specific catches above: without it, any
+        // exception this pipeline does not anticipate (e.g. ArgumentException from an empty
+        // input path) surfaces as a raw stack trace, which contradicts the rule that bad
+        // input is never a stack trace, and leaves exit code 1 unreachable despite being
+        // specified. Prints a one-line message and keeps the exception detail off stdout.
+#pragma warning disable CA1031 // deliberate top-level catch-all -- see comment above
+        catch (Exception ex)
+        {
+            await Console.Error.WriteLineAsync($"docmd: unexpected error: {ex.Message}").ConfigureAwait(false);
+            return ExitInternalError;
+        }
+#pragma warning restore CA1031
     }
 
     private const string UsageText = """

@@ -8,11 +8,8 @@
     <PackageId>Docmd.Cli</PackageId>
     <Description>Converts Microsoft Word documents to Markdown for AI/RAG indexing and human reading.</Description>
     <!-- CA1303: literal strings in console output are the product's UI, not
-         localisable resources.
-         CA1515: CommandLine, ParseResult and CommandKind are deliberately public rather than
-         internal + InternalsVisibleTo, so CommandLineTests (Docmd.Word.Tests) can reference
-         them directly. The CLI is not a library API anyone else consumes. -->
-    <NoWarn>$(NoWarn);CA1303;CA1515</NoWarn>
+         localisable resources. -->
+    <NoWarn>$(NoWarn);CA1303</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Docmd.Word/Docmd.Word.csproj" />
