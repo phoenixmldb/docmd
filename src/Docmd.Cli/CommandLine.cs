@@ -9,7 +9,6 @@ internal sealed record ParseResult(
     CommandKind Command,
     string? Input,
     ConversionOptions? Options,
-    bool Review,
     string? Error);
 
 /// <summary>
@@ -27,21 +26,21 @@ internal static class CommandLine
 
         if (args.Length == 0)
         {
-            return new ParseResult(CommandKind.Help, null, null, false, null);
+            return new ParseResult(CommandKind.Help, null, null, null);
         }
 
         switch (args[0])
         {
             case "--version" or "-V":
-                return new ParseResult(CommandKind.Version, null, null, false, null);
+                return new ParseResult(CommandKind.Version, null, null, null);
             case "--help" or "-h":
-                return new ParseResult(CommandKind.Help, null, null, false, null);
+                return new ParseResult(CommandKind.Help, null, null, null);
             case "audit":
-                return new ParseResult(CommandKind.Audit, args.ElementAtOrDefault(1), null, false, null);
+                return new ParseResult(CommandKind.Audit, args.ElementAtOrDefault(1), null, null);
             case "register":
-                return new ParseResult(CommandKind.Register, null, null, false, null);
+                return new ParseResult(CommandKind.Register, null, null, null);
             case "license":
-                return new ParseResult(CommandKind.License, null, null, false, null);
+                return new ParseResult(CommandKind.License, null, null, null);
             default:
                 break;
         }
@@ -53,7 +52,6 @@ internal static class CommandLine
         var includeFrontmatter = true;
         var flavour = MarkdownFlavour.Gfm;
         var imageDirectory = "img";
-        var review = false;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -61,7 +59,17 @@ internal static class CommandLine
 
             if (!argument.StartsWith('-'))
             {
-                input ??= argument;
+                // A second positional argument is a mistake, not a second job: "docmd a.docx
+                // b.docx" silently converted a.docx and said nothing about b.docx, which in a
+                // shell loop or a glob means an operator believes a corpus was converted when
+                // most of it was not. Batch conversion is a later plan; until it exists, say so.
+                if (input is not null)
+                {
+                    return Fail($"Unexpected argument '{argument}'. Pass a single input file; " +
+                                 "converting several at once is not yet supported.");
+                }
+
+                input = argument;
                 continue;
             }
 
@@ -71,8 +79,11 @@ internal static class CommandLine
                     includeImages = false;
                     break;
                 case "--review":
-                    review = true;
-                    break;
+                    // The review companion (spec §7.2) is a later plan. Accepting the flag and
+                    // silently producing no .review.html is the worst of the three options:
+                    // every other unimplemented flag here fails cleanly, and this is the flag
+                    // most likely to be tried, being the headline feature.
+                    return Fail($"{argument} (the HTML review companion) is not yet supported.");
                 case "-r" or "--recursive":
                     // Directory traversal is deferred to a later plan (the corpus audit
                     // needs it too, and the two should share one implementation). Fail
@@ -160,7 +171,7 @@ internal static class CommandLine
             ImageDirectoryName = imageDirectory,
         };
 
-        return new ParseResult(CommandKind.Convert, input, options, review, null);
+        return new ParseResult(CommandKind.Convert, input, options, null);
     }
 
     private static bool TryTake(string[] args, ref int index, out string value)
@@ -176,5 +187,5 @@ internal static class CommandLine
     }
 
     private static ParseResult Fail(string message)
-        => new(CommandKind.Help, null, null, false, message);
+        => new(CommandKind.Help, null, null, message);
 }

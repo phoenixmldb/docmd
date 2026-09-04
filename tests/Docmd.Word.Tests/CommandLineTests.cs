@@ -88,4 +88,33 @@ public sealed class CommandLineTests
 
         result.Error.Should().Contain("-r");
     }
+
+    // --review was accepted, advertised in --help, and did nothing: the run exited 0 having
+    // produced no .review.html. Every other unimplemented flag here fails cleanly, and this
+    // is the flag most likely to be tried, being spec §7.2's headline feature.
+    [Fact]
+    public void Parse_RejectsReviewAsNotYetSupported()
+    {
+        var result = CommandLine.Parse(["report.docx", "--review"]);
+
+        result.Error.Should().Contain("--review");
+    }
+
+    [Fact]
+    public void Parse_RejectsASecondPositionalArgument()
+    {
+        // "docmd a.docx b.docx" converted a.docx and said nothing about b.docx. In a shell
+        // loop or behind a glob that means an operator believes a corpus was converted when
+        // most of it was not -- the failure that is worst precisely because it is quiet.
+        var result = CommandLine.Parse(["a.docx", "b.docx"]);
+
+        result.Error.Should().Contain("b.docx");
+    }
+
+    [Fact]
+    public void Parse_DoesNotMistakeAFlagValueForASecondPositionalArgument()
+        // The guard above must not fire on "out/" or "img", which are consumed as flag
+        // values rather than seen as positionals.
+        => CommandLine.Parse(["a.docx", "-o", "out/", "--img-dir", "media", "--flavour", "gfm"])
+            .Error.Should().BeNull();
 }

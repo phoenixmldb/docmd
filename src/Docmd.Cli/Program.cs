@@ -21,8 +21,22 @@ internal static class Program
     private const int ExitPaidFeatureRequired = 5;
 #pragma warning restore CA1823
 
-    internal static async Task<int> Main(string[] args)
+    internal static Task<int> Main(string[] args) => Run(args, new PermissiveLicenseGate());
+
+    /// <summary>
+    /// The whole program, with the licence gate supplied rather than constructed.
+    /// </summary>
+    /// <remarks>
+    /// Exit code 3 (not registered) is part of the published contract, and with the gate
+    /// built inside Main it was unreachable from a test: the only implementation that
+    /// exists allows every run. Taking the gate as a parameter makes the refusal path
+    /// testable now, and makes swapping in the real verifier (spec §11) a change at one
+    /// call site rather than an edit to the program's body.
+    /// </remarks>
+    internal static async Task<int> Run(string[] args, ILicenseGate gate)
     {
+        ArgumentNullException.ThrowIfNull(gate);
+
         var parsed = CommandLine.Parse(args);
 
         if (parsed.Error is not null)
@@ -49,20 +63,17 @@ internal static class Program
                     _ => throw new UnreachableException(),
                 };
                 await Console.Error.WriteLineAsync($"docmd: '{name}' is not available yet.").ConfigureAwait(false);
-                return ExitInternalError;
+
+                // Spec §12 reserves 1 for an unexpected internal error. A deliberately
+                // unimplemented subcommand is neither unexpected nor internal, and
+                // returning 1 for it leaves a CI script unable to tell a bug from a
+                // command it should not have run.
+                return ExitBadInput;
             default:
                 break;
         }
 
-        // The gate is consulted once, before any work. Its implementation is a seam; typing
-        // the local as ILicenseGate (not `var`) keeps that seam compiler-checked at the exact
-        // call site where it matters -- a future RealLicenseGate that forgot to implement the
-        // interface would fail to compile here, not just wherever it happens to be assigned.
-        // CA1859 would rather this be the concrete PermissiveLicenseGate for a marginally
-        // cheaper dispatch; that trade is not worth it on a call site invoked once per run.
-#pragma warning disable CA1859 // interface-typed on purpose -- see comment above
-        ILicenseGate gate = new PermissiveLicenseGate();
-#pragma warning restore CA1859
+        // The gate is consulted once, before any work.
         var status = gate.Check();
         if (status.Notice is not null)
         {
@@ -74,7 +85,11 @@ internal static class Program
             return ExitNotRegistered;
         }
 
-        if (parsed.Input is null)
+        // IsNullOrWhiteSpace, not `is null`: `docmd ""` reached DocumentConverter, whose
+        // ArgumentException landed in the catch-all below and exited 1 -- an internal-error
+        // code for what is plainly a usage error, and a stack-trace-shaped message for
+        // exactly the case the CLI promises never to produce one for.
+        if (string.IsNullOrWhiteSpace(parsed.Input))
         {
             await Console.Error.WriteLineAsync("docmd: no input file given.").ConfigureAwait(false);
             return ExitBadInput;
@@ -144,7 +159,6 @@ internal static class Program
 
         Options:
           -o, --output <path>        output directory (default: .)
-              --review               also emit <name>.review.html
               --asset-base-url <url> emit remote URLs for local assets
               --img-dir <name>       image folder name (default: img)
               --no-images            omit images entirely
@@ -156,7 +170,8 @@ internal static class Program
         Only .docx, .docm, .dotx and .dotm are supported. Word 97-2003 (.doc) is a
         different, binary format - re-save it as .docx first.
 
-        Recursive directory conversion (-r / --recursive, and "docmd audit") is not yet
-        implemented; pass a single file.
+        Recursive directory conversion (-r / --recursive, and "docmd audit"), the HTML
+        review companion (--review), and "docmd register" / "docmd license" are not yet
+        implemented. Each fails with a message rather than doing nothing quietly.
         """;
 }
