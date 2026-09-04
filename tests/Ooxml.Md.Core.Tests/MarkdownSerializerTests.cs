@@ -72,6 +72,23 @@ public sealed class MarkdownSerializerTests
             .Should().Be("![](img/report/image2.png)\n");
 
     [Fact]
+    public void HardBreak_ContinuationLineIsEscapedAtItsOwnStart()
+    {
+        // A hard break puts a literal '\n' inside one paragraph's assembled text. If
+        // EscapeLineStart only ran once, over the whole string, a continuation line that
+        // happens to start with '-' or '#' would read back as a list item or heading
+        // interrupting the paragraph -- real content corruption, and people genuinely do
+        // fake lists with manual line breaks in Word.
+        Serialize("""<md:para><md:text>Steps:</md:text><md:br/><md:text>- item</md:text></md:para>""")
+            .Should().Be("Steps:  \n\\- item\n");
+    }
+
+    [Fact]
+    public void HardBreak_ContinuationLineStartingWithHashIsEscaped()
+        => Serialize("""<md:para><md:text>Note:</md:text><md:br/><md:text># not a heading</md:text></md:para>""")
+            .Should().Be("Note:  \n\\# not a heading\n");
+
+    [Fact]
     public void Blockquote_PrefixesEveryLine()
         => Serialize("""<md:blockquote><md:para><md:text>Caution.</md:text></md:para></md:blockquote>""")
             .Should().Be("> Caution.\n");

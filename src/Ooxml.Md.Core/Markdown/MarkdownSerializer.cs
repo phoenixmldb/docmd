@@ -59,9 +59,18 @@ public static class MarkdownSerializer
         {
             var line = new StringBuilder();
             WriteInline(line, block.Nodes(), options);
-            builder.Append(indent)
-                   .Append(MarkdownEscaper.EscapeLineStart(line.ToString()))
-                   .Append(Newline);
+
+            // A hard break (md:br) puts a literal '\n' inside the assembled text, so
+            // whether a character is line-leading is a property of each physical line, not
+            // of the paragraph as a whole. Escaping only the string's own start would leave
+            // a continuation line like "- item" unescaped, and CommonMark reads that as a
+            // list item interrupting the paragraph.
+            foreach (var physicalLine in line.ToString().Split(Newline))
+            {
+                builder.Append(indent)
+                       .Append(MarkdownEscaper.EscapeLineStart(physicalLine))
+                       .Append(Newline);
+            }
         }
         else if (block.Name == MdNames.Blockquote)
         {
