@@ -17,4 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Ooxml.Md.Core/Ooxml.Md.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="fixtures/**/*" CopyToOutputDirectory="PreserveNewest" LinkBase="fixtures" />
+  </ItemGroup>
 </Project>
