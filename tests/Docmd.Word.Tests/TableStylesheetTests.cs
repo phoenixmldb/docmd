@@ -80,6 +80,27 @@ public sealed class TableStylesheetTests
     }
 
     [Fact]
+    public async Task CellWithARunSplitMidWord_IsNotSpaceSeparated()
+    {
+        // The cell text was built by joining every w:t with a space, so a word Word's own
+        // spell-check split across two runs -- which it does constantly -- came out as
+        // "conver sion". Runs within one paragraph join with nothing; only the paragraph
+        // boundary is a space, as MultiParagraphCell_IsJoinedOntoOneLine pins.
+        var markdown = await ToMarkdownAsync("""
+            <w:tbl><w:tr>
+              <w:tc><w:p>
+                <w:r><w:t>The</w:t></w:r>
+                <w:r><w:t xml:space="preserve"> full </w:t></w:r>
+                <w:r><w:t>conver</w:t></w:r>
+                <w:r><w:t>sion</w:t></w:r>
+              </w:p></w:tc>
+            </w:tr></w:tbl>
+            """);
+
+        markdown.Should().Be("| The full conversion |\n| --- |\n");
+    }
+
+    [Fact]
     public async Task NestedTable_IsFlattenedIntoItsContainingCell()
     {
         // GFM cannot express nesting. The words survive for retrieval; the structure

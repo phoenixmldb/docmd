@@ -139,6 +139,32 @@ public sealed class MarkdownStylesheetTests
             .Should().Be("one  \ntwo\n");
 
     [Fact]
+    public async Task Tab_BecomesASingleSpace()
+    {
+        // Word's tab is a word separator, not decoration. Markdown has no tab stops, so
+        // the layout cannot survive -- but omitting the element welded "Name" and "Value"
+        // into "NameValue", which loses the words too.
+        var markdown = await ToMarkdownAsync("""
+            <w:p><w:r><w:t>Name</w:t><w:tab/><w:t>Value</w:t></w:r></w:p>
+            """);
+
+        markdown.Should().Be("Name Value\n");
+    }
+
+    [Fact]
+    public async Task TabInItsOwnRun_BecomesASingleSpace()
+        // Word puts the tab in a run of its own at least as often as inline: the run has
+        // no w:t at all, so the emit guard has to admit it.
+        => (await ToMarkdownAsync("""
+            <w:p>
+              <w:r><w:t>Name</w:t></w:r>
+              <w:r><w:tab/></w:r>
+              <w:r><w:t>Value</w:t></w:r>
+            </w:p>
+            """))
+            .Should().Be("Name Value\n");
+
+    [Fact]
     public async Task EmptyParagraphs_AreDropped()
     {
         // Word documents are full of empty paragraphs used as vertical spacing. Emitting

@@ -73,9 +73,16 @@
     </xsl:if>
   </xsl:template>
 
+  <!--
+    The numbering id actually in effect, or '' when there is none. w:numId 0 is not a
+    list: it is how Word CANCELS numbering a paragraph would otherwise inherit from its
+    style, so treating it as an id turns every opted-out paragraph into a bullet and
+    groups consecutive ones into a list that does not exist in the document.
+  -->
   <xsl:function name="docmd:num-id" as="xs:string">
     <xsl:param name="p" as="element(w:p)"/>
-    <xsl:sequence select="string(($p/w:pPr/w:numPr/w:numId/@w:val, '')[1])"/>
+    <xsl:variable name="id" select="string(($p/w:pPr/w:numPr/w:numId/@w:val, '')[1])"/>
+    <xsl:sequence select="if ($id eq '0') then '' else $id"/>
   </xsl:function>
 
   <xsl:function name="docmd:ilvl" as="xs:integer">
@@ -92,11 +99,19 @@
     <xsl:param name="numbering" as="element()?"/>
     <xsl:param name="numId" as="xs:string"/>
     <xsl:param name="ilvl" as="xs:integer"/>
+    <!--
+      Both lookups take the first match rather than the only one. Nothing enforces that a
+      numbering part declares each w:numId or each w:lvl once, and real documents (merged
+      files especially) declare them twice. fn:string() on a two-item sequence is a
+      dynamic error, which propagated out of ConvertAsync and ended the whole batch run,
+      contradicting the promise three lines above that one malformed document must never
+      stop a corpus conversion.
+    -->
     <xsl:variable name="abstractId"
-        select="string($numbering/w:num[@w:numId eq $numId]/w:abstractNumId/@w:val)"/>
+        select="string(($numbering/w:num[@w:numId eq $numId]/w:abstractNumId/@w:val)[1])"/>
     <xsl:variable name="format"
-        select="string($numbering/w:abstractNum[@w:abstractNumId eq $abstractId]
-                                  /w:lvl[xs:integer(@w:ilvl) eq $ilvl]/w:numFmt/@w:val)"/>
+        select="string(($numbering/w:abstractNum[@w:abstractNumId eq $abstractId]
+                                  /w:lvl[xs:integer(@w:ilvl) eq $ilvl]/w:numFmt/@w:val)[1])"/>
     <xsl:sequence select="$format ne '' and $format ne 'bullet' and $format ne 'none'"/>
   </xsl:function>
 
@@ -145,16 +160,25 @@
   </xsl:template>
 
   <!--
-    Three sibling patterns below all match w:p with a single predicate, so without an
+    The sibling patterns below all match w:p with a single predicate, so without an
     explicit priority they would all default to 0.5 and the engine is entitled to raise
     an ambiguous-rule error or silently pick either. This is not hypothetical: an empty
     paragraph that carries w:outlineLvl matches both the heading and empty-paragraph
     patterns below. Priorities are assigned in most-specific-first order:
 
       heading                    3
-      list suppression           2
       empty-paragraph            1
       generic paragraph          0
+
+    There is deliberately no rule suppressing w:p[w:pPr/w:numPr]. One existed, described
+    as an unreachable safety net for a list paragraph arriving by some route other than
+    build-list, and it emitted nothing. It was reachable by at least two routes, and on
+    both of them it deleted the paragraph's words: a w:numPr carrying w:ilvl but no
+    w:numId (numbering inherited from the style, so w:body's grouping key is '' and the
+    paragraph is applied directly), and a block-level w:sdt wrapping a numbered paragraph
+    (w:body groups the w:sdt, and the built-in rule walks into it). Producing nothing is
+    the one outcome spec §14 forbids; falling through to the generic paragraph rule below
+    loses the list marker and keeps the text, which is the right trade.
   -->
 
   <!-- Headings. Level comes from annotation and is zero-based, so +1 for Markdown. -->
@@ -164,14 +188,6 @@
       <md:text><xsl:value-of select="docmd:visible-text(.)"/></md:text>
     </md:heading>
   </xsl:template>
-
-  <!--
-    A list paragraph reached by any route other than build-list (e.g. as a lone item in
-    an apply-templates fallback) produces nothing rather than a stray paragraph. The
-    w:body template above never applies-templates to a list paragraph directly, but this
-    is the safety net named in the priority ladder.
-  -->
-  <xsl:template match="w:p[w:pPr/w:numPr]" priority="2"/>
 
   <!-- Empty paragraphs are vertical spacing in Word and mean nothing here. -->
   <xsl:template match="w:p[not(normalize-space(docmd:visible-text(.)))][not(.//w:drawing)]" priority="1"/>
@@ -197,9 +213,18 @@
                   Paragraphs are joined with a space: a newline inside a pipe cell would
                   terminate the row. Nested tables are flattened here for the same reason,
                   since GFM cannot express them, and the words matter more than the shape.
+
+                  Within one paragraph the runs are joined with NOTHING. Joining every w:t
+                  with a space inserts one wherever Word split a run, which it does
+                  constantly, so a cell reading "conversion" came out as "conver sion".
+                  This is the same defect MergeAdjacentMarkup fixed for inline text; a
+                  table cell reaches the serialiser as a single md:text, so it has to be
+                  fixed here as well as there.
                 -->
                 <md:text>
-                  <xsl:value-of select="normalize-space(string-join(.//w:t[not(ancestor::w:del)], ' '))"/>
+                  <xsl:value-of select="normalize-space(
+                      string-join(for $p in .//w:p
+                                  return string-join($p//w:t[not(ancestor::w:del)], ''), ' '))"/>
                 </md:text>
               </xsl:if>
             </md:cell>
@@ -247,7 +272,7 @@
   <xsl:template match="w:r" mode="inline">
     <xsl:variable name="text" select="string-join(w:t, '')"/>
 
-    <xsl:if test="$text ne '' or w:br or w:drawing">
+    <xsl:if test="$text ne '' or w:br or w:tab or w:drawing">
       <!--
         BRIEF DEFECT (flagged, not silently resolved: see task-7-report.md). The plan's
         given template built this sequence as "all w:t joined, then all w:br appended",
@@ -262,10 +287,17 @@
         Folding w:drawing into the same document-order union keeps it in true position.
       -->
       <xsl:variable name="innermost" as="node()*">
-        <xsl:for-each select="w:t | w:br | w:drawing">
+        <xsl:for-each select="w:t | w:br | w:tab | w:drawing">
           <xsl:choose>
             <xsl:when test="self::w:t"><md:text><xsl:value-of select="."/></md:text></xsl:when>
             <xsl:when test="self::w:br"><md:br/></xsl:when>
+            <!--
+              A tab is a word separator, not decoration: Markdown has no tab stops, and
+              omitting it welded "Name" and "Value" into "NameValue". One space is the
+              closest honest reading. xsl:text, because a whitespace-only text node
+              written directly in a stylesheet is stripped from it before it ever runs.
+            -->
+            <xsl:when test="self::w:tab"><md:text><xsl:text> </xsl:text></md:text></xsl:when>
             <xsl:otherwise><xsl:apply-templates select="." mode="inline"/></xsl:otherwise>
           </xsl:choose>
         </xsl:for-each>
