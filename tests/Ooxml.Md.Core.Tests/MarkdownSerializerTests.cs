@@ -88,4 +88,73 @@ public sealed class MarkdownSerializerTests
     [Fact]
     public void EmptyDocument_ProducesEmptyString()
         => Serialize("").Should().BeEmpty();
+
+    [Fact]
+    public void OrderedList_UsesNumericMarkers()
+        => Serialize("""
+            <md:list ordered="true">
+                <md:item><md:para><md:text>One</md:text></md:para></md:item>
+                <md:item><md:para><md:text>Two</md:text></md:para></md:item>
+            </md:list>
+            """)
+            .Should().Be("1. One\n2. Two\n");
+
+    [Fact]
+    public void UnorderedList_UsesHyphenMarkers()
+        => Serialize("""
+            <md:list ordered="false">
+                <md:item><md:para><md:text>One</md:text></md:para></md:item>
+                <md:item><md:para><md:text>Two</md:text></md:para></md:item>
+            </md:list>
+            """)
+            .Should().Be("- One\n- Two\n");
+
+    [Fact]
+    public void ListItem_WithMultipleBlocks_LeavesBlankSeparatorLinesEmpty()
+        // The middle line is a blank separator between the item's two paragraphs. It must
+        // be genuinely empty -- two trailing spaces is Markdown's hard-line-break syntax,
+        // and it would contradict the byte-identical output guarantee.
+        => Serialize("""<md:list ordered="false"><md:item><md:para><md:text>A</md:text></md:para><md:para><md:text>B</md:text></md:para></md:item></md:list>""")
+            .Should().Be("- A\n\n  B\n");
+
+    [Fact]
+    public void NestedList_IndentsUnderParentMarker()
+        => Serialize("""
+            <md:list ordered="false">
+                <md:item>
+                    <md:para><md:text>Parent</md:text></md:para>
+                    <md:list ordered="false">
+                        <md:item><md:para><md:text>Child</md:text></md:para></md:item>
+                    </md:list>
+                </md:item>
+            </md:list>
+            """)
+            .Should().Be("- Parent\n\n  - Child\n");
+
+    [Fact]
+    public void Table_TwoByTwoWithHeaderRow_EmitsPipesAndDelimiterRow()
+        => Serialize("""
+            <md:table>
+                <md:row header="true"><md:cell><md:text>A</md:text></md:cell><md:cell><md:text>B</md:text></md:cell></md:row>
+                <md:row><md:cell><md:text>1</md:text></md:cell><md:cell><md:text>2</md:text></md:cell></md:row>
+            </md:table>
+            """)
+            .Should().Be("| A | B |\n| --- | --- |\n| 1 | 2 |\n");
+
+    [Fact]
+    public void Table_SingleEmptyCell_YieldsPipeSpaceSpacePipe()
+        => Serialize("""<md:table><md:row header="true"><md:cell/></md:row></md:table>""")
+            .Should().Be("|  |\n| --- |\n");
+
+    [Fact]
+    public void Table_WithExplicitNonHeaderFirstRow_SynthesizesEmptyHeader()
+        // md:row/@header is part of the vocabulary; GFM cannot express a headerless table,
+        // so an explicit header="false" on the first row must not silently promote it --
+        // instead a synthetic empty header row is emitted ahead of the delimiter.
+        => Serialize("""
+            <md:table>
+                <md:row header="false"><md:cell><md:text>1</md:text></md:cell><md:cell><md:text>2</md:text></md:cell></md:row>
+            </md:table>
+            """)
+            .Should().Be("|  |  |\n| --- | --- |\n| 1 | 2 |\n");
 }

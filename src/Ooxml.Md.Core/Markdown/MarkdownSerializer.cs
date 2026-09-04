@@ -170,9 +170,24 @@ public static class MarkdownSerializer
             var lines = inner.ToString().TrimEnd('\n').Split('\n');
             for (var i = 0; i < lines.Length; i++)
             {
-                builder.Append(i == 0 ? indent + marker : childIndent)
-                       .Append(lines[i])
-                       .Append(Newline);
+                // A blank separator line between two blocks of the same item gets no
+                // indent prefix -- indenting it would leave trailing whitespace, and two
+                // trailing spaces is Markdown's hard-line-break syntax.
+                string prefix;
+                if (i == 0)
+                {
+                    prefix = indent + marker;
+                }
+                else if (lines[i].Length == 0)
+                {
+                    prefix = "";
+                }
+                else
+                {
+                    prefix = childIndent;
+                }
+
+                builder.Append(prefix).Append(lines[i]).Append(Newline);
             }
         }
     }
@@ -187,35 +202,56 @@ public static class MarkdownSerializer
 
         var columnCount = rows.Max(r => r.Elements(MdNames.Cell).Count());
 
+        // GFM has no way to express a headerless table. When the source explicitly marks
+        // its first row as not a header (header="false"), a data row must not be silently
+        // promoted -- a synthetic empty header row is emitted instead, ahead of the
+        // delimiter, so the table still parses and no data is misrepresented.
+        var firstRowIsHeader = !string.Equals((string?)rows[0].Attribute("header"), "false", StringComparison.Ordinal);
+        if (!firstRowIsHeader)
+        {
+            WriteTableRow(builder, options, indent, columnCount, Array.Empty<XElement>());
+            WriteTableDelimiter(builder, indent, columnCount);
+        }
+
         for (var rowIndex = 0; rowIndex < rows.Length; rowIndex++)
         {
             var cells = rows[rowIndex].Elements(MdNames.Cell).ToArray();
-            builder.Append(indent).Append("| ");
-            for (var column = 0; column < columnCount; column++)
-            {
-                if (column < cells.Length)
-                {
-                    WriteInline(builder, cells[column].Nodes(), options);
-                }
-
-                builder.Append(" | ");
-            }
-
-            builder.Length -= 1; // drop the trailing space
-            builder.Append(Newline);
+            WriteTableRow(builder, options, indent, columnCount, cells);
 
             // GFM requires the delimiter row immediately after the header row.
-            if (rowIndex == 0)
+            if (rowIndex == 0 && firstRowIsHeader)
             {
-                builder.Append(indent).Append('|');
-                for (var column = 0; column < columnCount; column++)
-                {
-                    builder.Append(" --- |");
-                }
-
-                builder.Append(Newline);
+                WriteTableDelimiter(builder, indent, columnCount);
             }
         }
+    }
+
+    private static void WriteTableRow(StringBuilder builder, MarkdownOptions options, string indent, int columnCount, XElement[] cells)
+    {
+        builder.Append(indent).Append("| ");
+        for (var column = 0; column < columnCount; column++)
+        {
+            if (column < cells.Length)
+            {
+                WriteInline(builder, cells[column].Nodes(), options);
+            }
+
+            builder.Append(" | ");
+        }
+
+        builder.Length -= 1; // drop the trailing space
+        builder.Append(Newline);
+    }
+
+    private static void WriteTableDelimiter(StringBuilder builder, string indent, int columnCount)
+    {
+        builder.Append(indent).Append('|');
+        for (var column = 0; column < columnCount; column++)
+        {
+            builder.Append(" --- |");
+        }
+
+        builder.Append(Newline);
     }
 
     private static int? ReadInt(XElement element, string attributeName)
