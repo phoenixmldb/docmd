@@ -21,7 +21,10 @@ public sealed class WordCompositeBuilderTests
         var composite = BuildComposite("composite-basic");
 
         composite.Root!.Name.Should().Be(WordNames.Docmd + "package");
+        // docmd:body wraps the original w:body element rather than splicing its children
+        // in directly -- the stylesheet's entry point matches "docmd:body/w:body".
         composite.Root.Element(WordNames.Docmd + "body")!
+                 .Element(WordNames.W + "body")!
                  .Element(WordNames.W + "p").Should().NotBeNull();
     }
 
@@ -30,7 +33,10 @@ public sealed class WordCompositeBuilderTests
     {
         var composite = BuildComposite("composite-basic");
 
+        // docmd:styles wraps the original w:styles element for the same reason docmd:body
+        // wraps w:body -- the stylesheet selects into "docmd:styles/w:styles".
         composite.Root!.Element(WordNames.Docmd + "styles")!
+                 .Element(WordNames.W + "styles")!
                  .Element(WordNames.W + "style").Should().NotBeNull();
         // numbering.xml is absent from this fixture; the element must still exist and be
         // empty, so the stylesheet never has to test for its presence.

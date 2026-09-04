@@ -56,15 +56,19 @@ public static class WordCompositeBuilder
             new XElement(WordNames.Docmd + "package",
                 new XAttribute(XNamespace.Xmlns + "docmd", WordNames.Docmd.NamespaceName),
                 new XAttribute("main-part", mainPartName),
-                // docmd:body/styles/numbering stand in for the original w:body/w:styles/
-                // w:numbering root: their children are copied in directly, not nested
-                // under a further w:body etc. wrapper, so a stylesheet can select
-                // docmd:body/w:p rather than docmd:body/w:body/w:p.
-                new XElement(WordNames.Docmd + "body", body.Nodes()),
+                // docmd:body/styles/numbering wrap the original w:body/w:styles/w:numbering
+                // element rather than splicing its children in directly. This is
+                // deliberate, not redundant nesting: the stylesheets match on the wrapped
+                // element itself (Task 7's entry point is
+                // "docmd:body/w:body", its recursive template matches "w:body", and it
+                // selects numbering via "docmd:numbering/w:numbering"), so removing the
+                // wrapper breaks every one of those selectors. See the Task 3 fix-round
+                // note in the SDD report for the assertions that got this wrong first.
+                new XElement(WordNames.Docmd + "body", new XElement(body)),
                 // Always present even when the source part is absent, so the stylesheet
                 // never has to test for existence before selecting into them.
-                new XElement(WordNames.Docmd + "styles", styles?.Nodes()),
-                new XElement(WordNames.Docmd + "numbering", numbering?.Nodes()),
+                new XElement(WordNames.Docmd + "styles", styles is null ? null : new XElement(styles)),
+                new XElement(WordNames.Docmd + "numbering", numbering is null ? null : new XElement(numbering)),
                 new XElement(WordNames.Docmd + "relationships", relationships),
                 properties));
     }
