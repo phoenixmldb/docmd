@@ -15,6 +15,9 @@ public sealed class MarkdownEscaperTests
     [InlineData("back`tick", @"back\`tick")]
     [InlineData(@"back\slash", @"back\\slash")]
     [InlineData("<tag>", @"\<tag\>")]
+    // GFM reads "~~text~~" as strikethrough, so an unescaped tilde pair deletes a word
+    // from the rendered document -- e.g. an approximate measurement written "~~5mm".
+    [InlineData("a ~~b~~ c", @"a \~\~b\~\~ c")]
     public void EscapeInline_EscapesMarkupCharacters(string input, string expected)
         => MarkdownEscaper.EscapeInline(input).Should().Be(expected);
 
@@ -43,4 +46,22 @@ public sealed class MarkdownEscaperTests
     public void EscapeUrl_EncodesSpacesAndParentheses()
         => MarkdownEscaper.EscapeUrl("img/my report/fig (1).png")
             .Should().Be("img/my%20report/fig%20%281%29.png");
+
+    [Theory]
+    // Already-encoded URLs are the common case, not the exception: every SharePoint and
+    // OneDrive path carries "%20", and anything naming a C# resource carries "%23".
+    // Encoding '%' first turned ".../C%23" into ".../C%2523" -- a link that still looks
+    // plausible and resolves to nothing.
+    [InlineData("https://example.com/topics/C%23")]
+    [InlineData("https://sharepoint.example.com/sites/My%20Docs/Handbook.docx")]
+    [InlineData("https://example.com/a%2Fb")]
+    public void EscapeUrl_LeavesAnAlreadyEncodedUrlAlone(string url)
+        => MarkdownEscaper.EscapeUrl(url).Should().Be(url);
+
+    [Fact]
+    public void EscapeUrl_EncodesControlCharacters()
+        // A control character inside a bare link destination is invalid per CommonMark,
+        // and a newline would end the destination outright.
+        => MarkdownEscaper.EscapeUrl("https://example.com/a\nb")
+            .Should().Be("https://example.com/a%0Ab");
 }

@@ -1,6 +1,7 @@
 namespace Ooxml.Md.Core.Markdown;
 
 using System.Buffers;
+using System.Globalization;
 using System.Text;
 
 /// <summary>
@@ -25,7 +26,7 @@ internal static class MarkdownEscaper
     /// that actually change meaning.
     /// </summary>
     private static readonly SearchValues<char> InlineSpecials =
-        SearchValues.Create(['\\', '`', '*', '_', '[', ']', '<', '>', '|']);
+        SearchValues.Create(['\\', '`', '*', '_', '[', ']', '<', '>', '|', '~']);
 
     internal static string EscapeInline(string text)
     {
@@ -112,10 +113,55 @@ internal static class MarkdownEscaper
     /// <summary>
     /// Percent-encodes the characters that would terminate an inline link destination.
     /// </summary>
+    /// <remarks>
+    /// '%' is deliberately NOT encoded. Encoding it first (as this did) re-encodes every
+    /// URL that already carries a percent escape, which is most of the URLs in the target
+    /// corpora: a SharePoint or OneDrive path is full of "%20", and any link to a C#
+    /// resource carries "%23". ".../C%23" became ".../C%2523" and ".../My%20Docs/" became
+    /// ".../My%2520Docs/" -- links that still look plausible and resolve to nothing. The
+    /// job here is narrower than "make this a valid URL", which is the caller's document
+    /// to get right: it is only to stop a destination ending early or being rejected
+    /// where it sits, so only the delimiters and the ASCII controls are touched.
+    /// </remarks>
     internal static string EscapeUrl(string url)
-        => (url ?? "")
-            .Replace("%", "%25", StringComparison.Ordinal)
-            .Replace(" ", "%20", StringComparison.Ordinal)
-            .Replace("(", "%28", StringComparison.Ordinal)
-            .Replace(")", "%29", StringComparison.Ordinal);
+    {
+        var text = url ?? "";
+        if (text.AsSpan().IndexOfAny(UrlSpecials) < 0)
+        {
+            return text;
+        }
+
+        var builder = new StringBuilder(text.Length + 8);
+        foreach (var ch in text)
+        {
+            if (UrlSpecials.Contains(ch))
+            {
+                builder.Append(CultureInfo.InvariantCulture, $"%{(int)ch:X2}");
+            }
+            else
+            {
+                builder.Append(ch);
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    /// <summary>
+    /// The characters that would end an inline link destination or be rejected inside
+    /// one: the parentheses delimiting it, the space, and the ASCII control characters
+    /// CommonMark forbids there.
+    /// </summary>
+    private static readonly SearchValues<char> UrlSpecials = SearchValues.Create(BuildUrlSpecials());
+
+    private static char[] BuildUrlSpecials()
+    {
+        var specials = new List<char> { '(', ')', ' ', '\u007F' };
+        for (var ch = '\u0000'; ch < ' '; ch++)
+        {
+            specials.Add(ch);
+        }
+
+        return [.. specials];
+    }
 }
