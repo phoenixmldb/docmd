@@ -13,7 +13,11 @@
     xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
     xmlns:docmd="https://phoenixml.dev/docmd"
     xmlns:md="https://phoenixml.dev/docmd/md"
-    exclude-result-prefixes="xs w docmd">
+    xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+    xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+    xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"
+    xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    exclude-result-prefixes="xs w docmd wp a pic r">
 
   <xsl:output method="xml" indent="no"/>
   <xsl:strip-space elements="*"/>
@@ -26,6 +30,48 @@
   </xsl:template>
 
   <xsl:variable name="numbering" select="/docmd:package/docmd:numbering/w:numbering"/>
+
+  <!--
+    Relationship targets were resolved during assembly, so this is a lookup, never path
+    arithmetic.
+  -->
+  <xsl:key name="rel" match="docmd:relationship" use="@id"/>
+
+  <xsl:function name="docmd:rel-target" as="xs:string">
+    <xsl:param name="package" as="document-node()"/>
+    <xsl:param name="id" as="xs:string?"/>
+    <xsl:sequence select="string(key('rel', $id, $package)/@target)"/>
+  </xsl:function>
+
+  <xsl:template match="w:hyperlink" mode="inline">
+    <xsl:variable name="href" select="docmd:rel-target(root(.), @r:id)"/>
+    <xsl:choose>
+      <xsl:when test="$href ne ''">
+        <md:link href="{$href}">
+          <xsl:apply-templates select="w:r" mode="inline"/>
+        </md:link>
+      </xsl:when>
+      <!-- A dangling r:id degrades to plain text: the words matter, the link does not. -->
+      <xsl:otherwise>
+        <xsl:apply-templates select="w:r" mode="inline"/>
+      </xsl:otherwise>
+    </xsl:choose>
+  </xsl:template>
+
+  <!--
+    src carries the PART NAME. AssetRewriter replaces it with the sink's URI before
+    serialisation, so the stylesheet stays ignorant of where assets go.
+    Alt text is the only thing an image contributes to a text index, so both descr and
+    title are tried.
+  -->
+  <xsl:template match="w:drawing" mode="inline">
+    <xsl:variable name="embed" select="(.//a:blip/@r:embed)[1]"/>
+    <xsl:variable name="target" select="docmd:rel-target(root(.), $embed)"/>
+    <xsl:if test="$target ne ''">
+      <md:image src="{$target}"
+                alt="{((.//wp:docPr/@descr)[1], (.//wp:docPr/@title)[1], '')[1]}"/>
+    </xsl:if>
+  </xsl:template>
 
   <xsl:function name="docmd:num-id" as="xs:string">
     <xsl:param name="p" as="element(w:p)"/>
@@ -201,7 +247,7 @@
   <xsl:template match="w:r" mode="inline">
     <xsl:variable name="text" select="string-join(w:t, '')"/>
 
-    <xsl:if test="$text ne '' or w:br">
+    <xsl:if test="$text ne '' or w:br or w:drawing">
       <!--
         BRIEF DEFECT (flagged, not silently resolved: see task-7-report.md). The plan's
         given template built this sequence as "all w:t joined, then all w:br appended",
@@ -209,12 +255,18 @@
         LineBreak_BecomesAHardBreak's "one", break, "two" inside a SINGLE w:r rendered as
         "onetwo  \n" instead of "one  \ntwo\n". "w:t | w:br" is a document-order union,
         so walking it in one pass keeps text and breaks interleaved correctly.
+
+        Task 10 REPEATS this fix for w:drawing rather than the plan's given
+        "apply-templates select='w:drawing' after the loop", which is the identical bug
+        in a new costume: an inline image between two text runs would jump to the end.
+        Folding w:drawing into the same document-order union keeps it in true position.
       -->
       <xsl:variable name="innermost" as="node()*">
-        <xsl:for-each select="w:t | w:br">
+        <xsl:for-each select="w:t | w:br | w:drawing">
           <xsl:choose>
             <xsl:when test="self::w:t"><md:text><xsl:value-of select="."/></md:text></xsl:when>
-            <xsl:otherwise><md:br/></xsl:otherwise>
+            <xsl:when test="self::w:br"><md:br/></xsl:when>
+            <xsl:otherwise><xsl:apply-templates select="." mode="inline"/></xsl:otherwise>
           </xsl:choose>
         </xsl:for-each>
       </xsl:variable>
