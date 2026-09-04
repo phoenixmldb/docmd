@@ -57,9 +57,11 @@ public static class MarkdownSerializer
         }
         else if (block.Name == MdNames.Para)
         {
-            builder.Append(indent);
-            WriteInline(builder, block.Nodes(), options);
-            builder.Append(Newline);
+            var line = new StringBuilder();
+            WriteInline(line, block.Nodes(), options);
+            builder.Append(indent)
+                   .Append(MarkdownEscaper.EscapeLineStart(line.ToString()))
+                   .Append(Newline);
         }
         else if (block.Name == MdNames.Blockquote)
         {
