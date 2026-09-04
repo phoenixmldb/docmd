@@ -220,11 +220,26 @@
                   This is the same defect MergeAdjacentMarkup fixed for inline text; a
                   table cell reaches the serialiser as a single md:text, so it has to be
                   fixed here as well as there.
+
+                  w:br and w:tab are therefore selected explicitly and contribute a space
+                  each. They used to get one by accident, from the w:t separator this cell
+                  no longer has, and losing it welded "A", break, "B" into "AB" and
+                  "Name", tab, "Value" into "NameValue": the exact word-welding this join
+                  was changed to stop, reappearing in the one path the inline emitters
+                  never reach. A break cannot survive as a break inside a pipe
+                  row, so a space is the closest honest reading; normalize-space below
+                  collapses whatever this produces.
                 -->
                 <md:text>
                   <xsl:value-of select="normalize-space(
-                      string-join(for $p in .//w:p
-                                  return string-join($p//w:t[not(ancestor::w:del)], ''), ' '))"/>
+                      string-join(
+                          for $p in .//w:p
+                          return string-join(
+                              for $n in $p//*[self::w:t or self::w:br or self::w:tab]
+                                             [not(ancestor::w:del)]
+                              return if ($n/self::w:t) then string($n) else ' ',
+                              ''),
+                          ' '))"/>
                 </md:text>
               </xsl:if>
             </md:cell>

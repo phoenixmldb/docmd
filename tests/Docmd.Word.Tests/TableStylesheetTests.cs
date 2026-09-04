@@ -101,6 +101,32 @@ public sealed class TableStylesheetTests
     }
 
     [Fact]
+    public async Task CellWithALineBreak_KeepsTheWordsApart()
+    {
+        // A break cannot survive as a break inside a pipe row, but the words it separates
+        // must still be separated. This space used to arrive by accident, from the w:t
+        // separator the fix above removed.
+        var markdown = await ToMarkdownAsync("""
+            <w:tbl><w:tr>
+              <w:tc><w:p><w:r><w:t>A</w:t><w:br/><w:t>B</w:t></w:r></w:p></w:tc>
+            </w:tr></w:tbl>
+            """);
+
+        markdown.Should().Be("| A B |\n| --- |\n");
+    }
+
+    [Fact]
+    public async Task CellWithATab_KeepsTheWordsApart()
+        // The same accident, and the same repair. Outside a table this is handled by the
+        // inline emitters, which a cell never reaches.
+        => (await ToMarkdownAsync("""
+            <w:tbl><w:tr>
+              <w:tc><w:p><w:r><w:t>Name</w:t><w:tab/><w:t>Value</w:t></w:r></w:p></w:tc>
+            </w:tr></w:tbl>
+            """))
+            .Should().Be("| Name Value |\n| --- |\n");
+
+    [Fact]
     public async Task NestedTable_IsFlattenedIntoItsContainingCell()
     {
         // GFM cannot express nesting. The words survive for retrieval; the structure
