@@ -3,6 +3,7 @@ namespace Ooxml.Md.Core.Tests;
 using FluentAssertions;
 using Ooxml.Md.Core.Frontmatter;
 using Xunit;
+using YamlDotNet.Serialization;
 
 public sealed class FrontmatterWriterTests
 {
@@ -88,6 +89,66 @@ public sealed class FrontmatterWriterTests
 
         yaml.Should().Be($"---\ntitle: {expected}\nsource: report.docx\nsha256: 9f2c1a\n---\n\n");
     }
+
+    /// <summary>
+    /// Writes the frontmatter, then reads it back with a real YAML parser and returns the
+    /// mapping it saw.
+    /// </summary>
+    /// <remarks>
+    /// The same argument as the Markdig oracle for the Markdown serialiser (spec §13.2):
+    /// asserting the exact string this writer emits proves it emits what we intended, not
+    /// that a parser agrees. Both failure modes below are invisible to a string
+    /// comparison written by the same person who wrote the quoting rule. YamlDotNet is
+    /// already a dependency of the production project, so this costs nothing.
+    /// </remarks>
+    private static Dictionary<string, string> ReadBackWithARealYamlParser(string title)
+    {
+        var yaml = FrontmatterWriter.Write(Minimal with { Title = title });
+        var body = yaml["---\n".Length..yaml.IndexOf("\n---\n", StringComparison.Ordinal)];
+
+        return new DeserializerBuilder().Build().Deserialize<Dictionary<string, string>>(body);
+    }
+
+    [Theory]
+    // " #" starts a comment: this one is not a parse error but a SILENT truncation --
+    // "Rev # 3" reads back as "Rev", keeping its key and losing its value.
+    [InlineData("Rev # 3")]
+    [InlineData("Rev #")]
+    // Everything below begins with a YAML indicator character. Unquoted, these are syntax
+    // errors, and a syntax error inside the frontmatter loses the ENTIRE block -- every
+    // field of it -- not just the field that carries the offending character.
+    [InlineData("\"Best Practice\" Guide")]
+    [InlineData("'Draft' copy")]
+    [InlineData("!Urgent review")]
+    [InlineData("?Unresolved")]
+    [InlineData("|Pipeline overview")]
+    [InlineData(">Forwarded: notes")]
+    [InlineData("@mentions and handles")]
+    [InlineData("`literal` naming")]
+    [InlineData("%complete")]
+    [InlineData(",leading comma")]
+    [InlineData("]stray bracket")]
+    [InlineData("}stray brace")]
+    // Already handled before this pass; included so the oracle covers the whole rule
+    // rather than only the part that was broken.
+    [InlineData("#hashtag")]
+    [InlineData("&anchor")]
+    [InlineData("*alias")]
+    [InlineData("[flow start")]
+    [InlineData("{flow start")]
+    [InlineData("-dash start")]
+    [InlineData(":colon start")]
+    [InlineData("Report: Phase 2")]
+    [InlineData("Trailing space ")]
+    public void Write_SurvivesARoundTripThroughARealYamlParser(string title)
+        => ReadBackWithARealYamlParser(title)["title"].Should().Be(title);
+
+    [Fact]
+    public void Write_KeepsAHashThatIsNotACommentUnquoted()
+        // "C#" carries no space before the '#', so it is not a comment and needs no
+        // quoting. Over-quoting is not free: it is noise on every field it touches.
+        => FrontmatterWriter.Write(Minimal with { Title = "C# Coding Standard" })
+            .Should().Contain("title: C# Coding Standard");
 
     [Fact]
     public void Write_NormalizesAnInternalLineFeedToASpaceInsteadOfBreakingTheBlock()

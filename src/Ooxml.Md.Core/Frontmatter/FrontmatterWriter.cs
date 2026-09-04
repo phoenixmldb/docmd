@@ -88,9 +88,13 @@ public static class FrontmatterWriter
 
         var needsQuoting =
             normalized.Contains(": ", StringComparison.Ordinal) ||
+            // A space followed by '#' starts a YAML comment, so "Rev # 3" reads back as
+            // "Rev" -- the field keeps its key and quietly loses most of its value, which
+            // is worse than a parse error because nothing anywhere reports it. This also
+            // covers a value merely ENDING in " #", for the same reason.
+            normalized.Contains(" #", StringComparison.Ordinal) ||
             normalized.EndsWith(':') ||
-            normalized.StartsWith('#') || normalized.StartsWith('&') || normalized.StartsWith('*') ||
-            normalized.StartsWith('[') || normalized.StartsWith('{') || normalized.StartsWith('-') ||
+            IsYamlIndicator(normalized[0]) ||
             normalized.StartsWith(' ') || normalized.EndsWith(' ') ||
             LooksLikeYamlNumber(normalized) ||
             LooksLikeYamlHex(normalized) ||
@@ -101,6 +105,24 @@ public static class FrontmatterWriter
 
         return needsQuoting ? $"'{normalized.Replace("'", "''", StringComparison.Ordinal)}'" : normalized;
     }
+
+    /// <summary>
+    /// Whether a character is a YAML indicator, i.e. reserved as the first character of a
+    /// plain scalar.
+    /// </summary>
+    /// <remarks>
+    /// Unlike the resolution hazards elsewhere in this file -- where a bare value comes
+    /// back as a number, a boolean or null -- these do not merely change one field's type.
+    /// A leading indicator is a syntax error, and a syntax error inside the frontmatter
+    /// block loses the WHOLE block: every field, on every document whose title happens to
+    /// start with a quotation mark, an exclamation mark or a bullet character Word turned
+    /// into '-'. That is a large blast radius for a single character, so the full
+    /// indicator set is listed rather than the handful previously guessed at.
+    /// </remarks>
+    private static bool IsYamlIndicator(char first) => first is
+        // c-indicator, per the YAML 1.2 spec's own production.
+        '-' or '?' or ':' or ',' or '[' or ']' or '{' or '}' or '#' or '&' or '*' or
+        '!' or '|' or '>' or '\'' or '"' or '%' or '@' or '`';
 
     /// <summary>A bare value that a YAML parser would resolve as a decimal integer or a float.</summary>
     private static bool LooksLikeYamlNumber(string value) =>
