@@ -6,7 +6,6 @@ using Docmd.Word;
 using Docmd.Word.Assembly;
 using FluentAssertions;
 using Ooxml.Md.Core.Markdown;
-using PhoenixmlDb.Xslt;
 using Xunit;
 
 public sealed class LinkAndImageStylesheetTests
@@ -36,14 +35,10 @@ public sealed class LinkAndImageStylesheetTests
               </docmd:relationships>
               <docmd:properties/>
             </docmd:package>
-            """);
+            """, LoadOptions.PreserveWhitespace);
 
         HeadingAnnotator.Annotate(composite);
-
-        var transformer = new XsltTransformer();
-        await transformer.LoadStylesheetAsync(StylesheetLoader.Read("markdown.xslt"));
-        return XDocument.Parse(await transformer.TransformAsync(
-            composite.ToString(), TestContext.Current.CancellationToken));
+        return await MarkdownTransform.RunAsync(composite, TestContext.Current.CancellationToken);
     }
 
     /// <summary>Transforms, then serialises -- the two stages callers actually compose.</summary>

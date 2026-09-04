@@ -2,13 +2,11 @@ namespace Docmd.Word;
 
 using System.Security.Cryptography;
 using System.Text;
-using System.Xml.Linq;
 using Docmd.Word.Assembly;
 using Ooxml.Md.Core.Assets;
 using Ooxml.Md.Core.Frontmatter;
 using Ooxml.Md.Core.Markdown;
 using Ooxml.Md.Core.Opc;
-using PhoenixmlDb.Xslt;
 
 /// <summary>Runs the five pipeline stages over one document.</summary>
 public static class DocumentConverter
@@ -31,10 +29,9 @@ public static class DocumentConverter
         // 3: annotate.
         HeadingAnnotator.Annotate(composite);
 
-        // 4: transform.
-        var transformer = new XsltTransformer();
-        await transformer.LoadStylesheetAsync(StylesheetLoader.Read("markdown.xslt")).ConfigureAwait(false);
-        var mdXml = XDocument.Parse(await transformer.TransformAsync(composite.ToString(), ct).ConfigureAwait(false));
+        // 4: transform. The transform-and-parse join lives in one place (MarkdownTransform)
+        // because it is itself a place data can be lost -- see that type's remarks.
+        var mdXml = await MarkdownTransform.RunAsync(composite, ct).ConfigureAwait(false);
 
         // 5a: assets first, so 5b can serialise the URIs the sink returned. Inverting this
         // would still write every asset to disk, but the Markdown string below would be

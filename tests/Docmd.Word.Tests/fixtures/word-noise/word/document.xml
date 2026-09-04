@@ -45,6 +45,20 @@
     </w:p>
 
     <!--
+      A run containing nothing but a space, sitting between two bold runs. This is what
+      Word emits between a bold phrase and the next bold word whenever a proofing or rsid
+      boundary falls on the space itself, and it is the shape that XDocument.Parse's
+      default LoadOptions destroyed: whitespace-only text nodes were silently discarded,
+      welding the two words into "**Safety****Review**".
+    -->
+    <w:p w:rsidR="00071829" w:rsidRDefault="00071829">
+      <w:r w:rsidR="00071829"><w:rPr><w:b/></w:rPr><w:t>Safety</w:t></w:r>
+      <w:r w:rsidR="00071829"><w:t xml:space="preserve"> </w:t></w:r>
+      <w:r w:rsidR="00182930"><w:rPr><w:b/></w:rPr><w:t>Review</w:t></w:r>
+      <w:r w:rsidR="00071829"><w:t xml:space="preserve"> is overdue.</w:t></w:r>
+    </w:p>
+
+    <!--
       A third paragraph: grammar-check noise and a bookmark spanning ordinary,
       already-whole words, proving the converter tolerates the noise even when it is not
       sitting on a split.

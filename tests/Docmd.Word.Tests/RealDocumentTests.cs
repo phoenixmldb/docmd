@@ -111,6 +111,13 @@ public sealed class RealDocumentTests : IDisposable
         markdown.Should().Contain("assembly", "proofErr/bookmark noise between two plain runs must not leak text or whitespace between them");
         markdown.Should().NotContain("assem bly");
 
+        // A run whose entire content is a single space sits between the two bold runs of
+        // "Safety Review". Whitespace-only text nodes are exactly what XDocument.Parse
+        // discards by default, and losing this one welds the two words together as
+        // "**Safety****Review**" -- caught by the NotContain("****") above only by
+        // coincidence, so the joined form is asserted directly.
+        markdown.Should().Contain("**Safety** **Review**", "a space-only run between two bold runs is a space, not nothing");
+
         // None of Word's own noise should leak into the visible text.
         markdown.Should().NotContain("proofErr");
         markdown.Should().NotContain("bookmarkStart");

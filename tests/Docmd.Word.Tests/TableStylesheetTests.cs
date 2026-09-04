@@ -6,7 +6,6 @@ using Docmd.Word;
 using Docmd.Word.Assembly;
 using FluentAssertions;
 using Ooxml.Md.Core.Markdown;
-using PhoenixmlDb.Xslt;
 using Xunit;
 
 public sealed class TableStylesheetTests
@@ -25,13 +24,11 @@ public sealed class TableStylesheetTests
               <docmd:numbering><w:numbering/></docmd:numbering>
               <docmd:relationships/><docmd:properties/>
             </docmd:package>
-            """);
+            """, LoadOptions.PreserveWhitespace);
 
         HeadingAnnotator.Annotate(composite);
-        var transformer = new XsltTransformer();
-        await transformer.LoadStylesheetAsync(StylesheetLoader.Read("markdown.xslt"));
-        return MarkdownSerializer.Serialize(XDocument.Parse(await transformer.TransformAsync(
-            composite.ToString(), TestContext.Current.CancellationToken)));
+        return MarkdownSerializer.Serialize(
+            await MarkdownTransform.RunAsync(composite, TestContext.Current.CancellationToken));
     }
 
     [Fact]

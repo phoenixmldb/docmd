@@ -6,7 +6,6 @@ using Docmd.Word;
 using Docmd.Word.Assembly;
 using FluentAssertions;
 using Ooxml.Md.Core.Markdown;
-using PhoenixmlDb.Xslt;
 using Xunit;
 
 public sealed class MarkdownStylesheetTests
@@ -24,14 +23,10 @@ public sealed class MarkdownStylesheetTests
               <docmd:relationships/>
               <docmd:properties/>
             </docmd:package>
-            """);
+            """, LoadOptions.PreserveWhitespace);
 
         HeadingAnnotator.Annotate(composite);
-
-        var transformer = new XsltTransformer();
-        await transformer.LoadStylesheetAsync(StylesheetLoader.Read("markdown.xslt"));
-        return XDocument.Parse(await transformer.TransformAsync(
-            composite.ToString(), TestContext.Current.CancellationToken));
+        return await MarkdownTransform.RunAsync(composite, TestContext.Current.CancellationToken);
     }
 
     /// <summary>Transforms, then serialises — the two stages callers actually compose.</summary>
@@ -105,6 +100,36 @@ public sealed class MarkdownStylesheetTests
             </w:p>
             """))
             .Should().Be("before after\n");
+
+    [Fact]
+    public async Task SpaceOnlyRun_BetweenBoldRuns_SurvivesAsASpace()
+    {
+        // A run whose entire content is one space is what Word puts between a bold phrase
+        // and the next word, on either side of a w:hyperlink, and wherever an rsid or
+        // proofing boundary falls. XDocument.Parse's default LoadOptions.None discards
+        // whitespace-only text nodes, so this used to serialise as "**Safety****Review**"
+        // -- two words welded together with four asterisks between them.
+        var markdown = await ToMarkdownAsync("""
+            <w:p>
+              <w:r><w:rPr><w:b/></w:rPr><w:t>Safety</w:t></w:r>
+              <w:r><w:t xml:space="preserve"> </w:t></w:r>
+              <w:r><w:rPr><w:b/></w:rPr><w:t>Review</w:t></w:r>
+            </w:p>
+            """);
+
+        markdown.Should().Be("**Safety** **Review**\n");
+    }
+
+    [Fact]
+    public async Task SpaceOnlyRun_BetweenPlainRuns_SurvivesAsASpace()
+        => (await ToMarkdownAsync("""
+            <w:p>
+              <w:r><w:t>Hello</w:t></w:r>
+              <w:r><w:t xml:space="preserve"> </w:t></w:r>
+              <w:r><w:t>world</w:t></w:r>
+            </w:p>
+            """))
+            .Should().Be("Hello world\n");
 
     [Fact]
     public async Task LineBreak_BecomesAHardBreak()
