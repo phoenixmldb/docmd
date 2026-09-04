@@ -53,7 +53,7 @@ public sealed class AssetRewriterTests
         {
             var mdXml = MdWithImage("word/media/image1.png");
             using var package = OpenMinimal();
-            var sink = new FileSystemAssetSink(directory, baseUrl: "https://cdn.example.com/docs");
+            var sink = new FileSystemAssetSink(directory, baseUrl: new Uri("https://cdn.example.com/docs"));
 
             await AssetRewriter.RewriteAsync(mdXml, package, sink, "report", TestContext.Current.CancellationToken);
 
@@ -130,8 +130,13 @@ public sealed class AssetRewriterTests
                         new XAttribute("src", "word/media/image1.png"), new XAttribute("alt", "B")))));
 
             using var package = OpenMinimal();
-            await AssetRewriter.RewriteAsync(mdXml, package, new FileSystemAssetSink(directory, null), "report", TestContext.Current.CancellationToken);
+            // A spy, not just FileSystemAssetSink directly: that sink overwrites
+            // idempotently, so asserting on the two @src values alone cannot tell "written
+            // once" from "written twice with the same result". Counting calls can.
+            var sink = new CountingAssetSink(new FileSystemAssetSink(directory, null));
+            await AssetRewriter.RewriteAsync(mdXml, package, sink, "report", TestContext.Current.CancellationToken);
 
+            sink.WriteCount.Should().Be(1);
             mdXml.Descendants(MdNames.Image)
                  .Select(e => e.Attribute("src")!.Value)
                  .Should().AllBe("img/report/image1.png");
@@ -139,6 +144,19 @@ public sealed class AssetRewriterTests
         finally
         {
             Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    /// <summary>Counts calls so a test can prove "written once", not just infer it from an
+    /// idempotent sink producing the same result twice.</summary>
+    private sealed class CountingAssetSink(IAssetSink inner) : IAssetSink
+    {
+        public int WriteCount { get; private set; }
+
+        public async Task<Uri> WriteAsync(string relativePath, Stream content, string contentType, CancellationToken ct)
+        {
+            WriteCount++;
+            return await inner.WriteAsync(relativePath, content, contentType, ct).ConfigureAwait(false);
         }
     }
 }

@@ -5,15 +5,12 @@ namespace Ooxml.Md.Core.Assets;
 /// <param name="baseUrl">
 /// When set, the returned URI is this prefix plus the relative path, while the bytes still
 /// land locally. That is the entirety of --asset-base-url: the customer's existing sync
-/// step moves the files, and docmd only has to say the right thing.
+/// step moves the files, and docmd only has to say the right thing. Typed as a
+/// <see cref="Uri"/>, not a string, so a malformed value fails loudly at the argument
+/// boundary (e.g. a CLI-side <c>Uri.TryCreate(raw, UriKind.Absolute, out var baseUri)</c>)
+/// instead of surviving to the first <see cref="WriteAsync"/> call deep in the pipeline.
 /// </param>
-// baseUrl is a URL prefix fragment (e.g. "https://cdn.example.com/docs"), concatenated
-// with a relative path rather than used as a standalone URI, so System.Uri is not the
-// right parameter type despite what CA1054 suggests. The brief's contract (spec §10.1)
-// fixes this constructor's shape verbatim.
-#pragma warning disable CA1054
-public sealed class FileSystemAssetSink(string outputDirectory, string? baseUrl) : IAssetSink
-#pragma warning restore CA1054
+public sealed class FileSystemAssetSink(string outputDirectory, Uri? baseUrl) : IAssetSink
 {
     public async Task<Uri> WriteAsync(string relativePath, Stream content, string contentType, CancellationToken ct)
     {
@@ -29,8 +26,13 @@ public sealed class FileSystemAssetSink(string outputDirectory, string? baseUrl)
             await content.CopyToAsync(file, ct).ConfigureAwait(false);
         }
 
-        return string.IsNullOrEmpty(baseUrl)
+        // Deliberately string concatenation, not `new Uri(baseUrl, relativePath)`: that
+        // constructor treats the base as a *file*, not a directory, unless it already ends
+        // in '/', so "https://cdn.example.com/docs" combined with "img/x.png" silently
+        // drops "docs" and produces "https://cdn.example.com/img/x.png". Concatenating the
+        // base's literal text is the only way the whole prefix is guaranteed to survive.
+        return baseUrl is null
             ? new Uri(relativePath, UriKind.Relative)
-            : new Uri($"{baseUrl.TrimEnd('/')}/{relativePath}", UriKind.Absolute);
+            : new Uri($"{baseUrl.OriginalString.TrimEnd('/')}/{relativePath}", UriKind.Absolute);
     }
 }
