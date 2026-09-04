@@ -90,17 +90,78 @@ public sealed class HeadingAnnotatorTests
     }
 
     [Fact]
-    public void Annotate_DoesNotTreatALongBoldSentenceAsAHeading()
+    public void Annotate_RejectsABoldOversizedLineEndingInAPeriod()
     {
+        // Pins the trailing-period guard in isolation: short and well under the length
+        // guard, so only HeadingAnnotator.LooksLikeADirectFormatHeading's EndsWith('.')
+        // check can be rejecting it.
         var composite = Annotate("""
             <w:p>
-              <w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr>
-                <w:t>This is a long emphatic sentence that runs on well past what any reasonable heading would, and it ends with a full stop.</w:t>
-              </w:r>
+              <w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr><w:t>A short bold sentence.</w:t></w:r>
             </w:p>
             """);
 
         FirstParagraph(composite).Attribute(WordNames.Docmd + "heading-source")!.Value.Should().Be("None");
+    }
+
+    [Fact]
+    public void Annotate_RejectsABoldOversizedLineOverTheLengthGuardWithNoTrailingPeriod()
+    {
+        // Pins the length guard in isolation. No trailing period, so EndsWith('.') cannot
+        // be why this is rejected -- only text.Length > MaxDirectFormatHeadingLength (120)
+        // can be. A 130-character run of 'a' keeps the length self-evident from the
+        // literal so a future edit can't silently drift it back under the threshold.
+        var text = new string('a', 130);
+        text.Length.Should().BeGreaterThan(120);
+
+        var composite = Annotate($"""
+            <w:p>
+              <w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr><w:t>{text}</w:t></w:r>
+            </w:p>
+            """);
+
+        FirstParagraph(composite).Attribute(WordNames.Docmd + "heading-source")!.Value.Should().Be("None");
+    }
+
+    [Fact]
+    public void Annotate_RejectsAPartiallyBoldLine()
+    {
+        // Pins the allBold guard: one run in the paragraph is not bold, so the paragraph
+        // as a whole must not be treated as direct-format even though it is otherwise
+        // oversized, short, and period-free.
+        var composite = Annotate("""
+            <w:p>
+              <w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr><w:t>Bold part </w:t></w:r>
+              <w:r><w:rPr><w:sz w:val="32"/></w:rPr><w:t>not-bold part</w:t></w:r>
+            </w:p>
+            """);
+
+        FirstParagraph(composite).Attribute(WordNames.Docmd + "heading-source")!.Value.Should().Be("None");
+    }
+
+    [Fact]
+    public void Annotate_RejectsABoldLineOnlyThreeHalfPointsOverTheDefault()
+    {
+        // Default body size falls back to 22 half-points (11pt) when docDefaults says
+        // nothing -- see StyleResolverTests.DefaultFontHalfPoints_FallsBackToWordsDefault.
+        // DirectFormatSizeMargin is 4, so 25 (default + 3) must fall just short.
+        var composite = Annotate("""
+            <w:p><w:r><w:rPr><w:b/><w:sz w:val="25"/></w:rPr><w:t>Short bold line</w:t></w:r></w:p>
+            """);
+
+        FirstParagraph(composite).Attribute(WordNames.Docmd + "heading-source")!.Value.Should().Be("None");
+    }
+
+    [Fact]
+    public void Annotate_AcceptsABoldLineExactlyFourHalfPointsOverTheDefault()
+    {
+        // The margin check is >=, so 26 (default 22 + the full DirectFormatSizeMargin of
+        // 4) is the smallest size that must be accepted.
+        var composite = Annotate("""
+            <w:p><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>Short bold line</w:t></w:r></w:p>
+            """);
+
+        FirstParagraph(composite).Attribute(WordNames.Docmd + "heading-source")!.Value.Should().Be("DirectFormat");
     }
 
     [Fact]
