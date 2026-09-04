@@ -39,6 +39,15 @@ public sealed class OpcPackage : IDisposable
         }
         catch (InvalidDataException ex)
         {
+            // OpcPackage only takes ownership of the stream on success (recorded as
+            // _ownedStream). On this failure path nothing else will ever dispose it, so
+            // this method -- not each caller -- must do it itself, unless the caller asked
+            // to keep owning the stream via leaveOpen.
+            if (!leaveOpen)
+            {
+                stream.Dispose();
+            }
+
             throw new OpcFormatException(
                 "The file is not a readable OPC package. Word 97-2003 (.doc) files are a " +
                 "different, binary format; re-save as .docx.", ex);
@@ -53,18 +62,7 @@ public sealed class OpcPackage : IDisposable
             throw new OpcFormatException($"File not found: {path}");
         }
 
-        var stream = File.OpenRead(path);
-        try
-        {
-            return Open(stream);
-        }
-        catch
-        {
-            // Open() only takes ownership of the stream on success; on a thrown
-            // OpcFormatException the FileStream would otherwise leak.
-            stream.Dispose();
-            throw;
-        }
+        return Open(File.OpenRead(path));
     }
 
     public bool ContainsPart(string partName)

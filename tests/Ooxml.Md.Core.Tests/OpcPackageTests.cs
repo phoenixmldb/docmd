@@ -116,4 +116,51 @@ public sealed class OpcPackageTests
 
         act.Should().Throw<OpcFormatException>();
     }
+
+    [Fact]
+    public void Open_DisposesTheStreamOnFailure_WhenLeaveOpenIsFalse()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllBytes(path, "this is not a zip"u8.ToArray());
+            var stream = File.OpenRead(path);
+            // Captured before the call: Open() disposes the FileStream on this path, so
+            // asserting through a handle grabbed beforehand -- not through the stream
+            // itself afterwards -- is what proves ownership was actually taken.
+            var handle = stream.SafeFileHandle;
+
+            var act = () => OpcPackage.Open(stream);
+
+            act.Should().Throw<OpcFormatException>();
+            handle.IsClosed.Should().BeTrue();
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Open_LeavesTheStreamOpenOnFailure_WhenLeaveOpenIsTrue()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllBytes(path, "this is not a zip"u8.ToArray());
+            using var stream = File.OpenRead(path);
+            var handle = stream.SafeFileHandle;
+
+            var act = () => OpcPackage.Open(stream, leaveOpen: true);
+
+            act.Should().Throw<OpcFormatException>();
+            // leaveOpen: true is a contract Open() must honour even on its failure path --
+            // the caller still owns the stream and must be free to keep using it.
+            handle.IsClosed.Should().BeFalse();
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
 }
