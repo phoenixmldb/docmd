@@ -70,6 +70,44 @@ public sealed class StyleResolverTests
     }
 
     [Fact]
+    public void EffectiveOutlineLevel_TreatsNineAsBodyTextRatherThanADeepHeading()
+        // ECMA-376 §17.3.1.20 reserves 9 for body text, and stock Word styles set it.
+        => Resolve($"""
+            <w:styles {Ns}>
+              <w:style w:styleId="BodyText"><w:pPr><w:outlineLvl w:val="9"/></w:pPr></w:style>
+            </w:styles>
+            """)
+            .EffectiveOutlineLevel("BodyText").Should().BeNull();
+
+    [Fact]
+    public void EffectiveOutlineLevel_DoesNotInheritAThroughStyleThatDeclaresBodyText()
+    {
+        // A style that says "outline level 9" is saying it is NOT a heading, which
+        // overrides whatever it is based on. Continuing the basedOn walk past it would
+        // resurrect Heading1's level 0 and turn deliberately-demoted prose into an H1.
+        var resolver = Resolve($"""
+            <w:styles {Ns}>
+              <w:style w:styleId="Heading1"><w:pPr><w:outlineLvl w:val="0"/></w:pPr></w:style>
+              <w:style w:styleId="QuietTitle">
+                <w:basedOn w:val="Heading1"/><w:pPr><w:outlineLvl w:val="9"/></w:pPr>
+              </w:style>
+            </w:styles>
+            """);
+
+        resolver.EffectiveOutlineLevel("QuietTitle").Should().BeNull();
+        resolver.EffectiveOutlineLevel("Heading1").Should().Be(0);
+    }
+
+    [Fact]
+    public void EffectiveOutlineLevel_AcceptsEightAsTheDeepestHeadingLevel()
+        => Resolve($"""
+            <w:styles {Ns}>
+              <w:style w:styleId="Heading9"><w:pPr><w:outlineLvl w:val="8"/></w:pPr></w:style>
+            </w:styles>
+            """)
+            .EffectiveOutlineLevel("Heading9").Should().Be(8);
+
+    [Fact]
     public void EffectiveOutlineLevel_IsNullForAnUnknownStyle()
         => Resolve($"<w:styles {Ns}/>").EffectiveOutlineLevel("Nope").Should().BeNull();
 

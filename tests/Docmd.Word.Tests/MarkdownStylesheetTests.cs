@@ -76,6 +76,35 @@ public sealed class MarkdownStylesheetTests
             """))
             .Should().Be("***both***\n");
 
+    [Theory]
+    [InlineData("0")]
+    [InlineData("false")]
+    [InlineData("off")]
+    public async Task RunWithBoldTurnedOff_IsNotBold(string offValue)
+        // w:b is an ST_OnOff toggle. "<w:b w:val='0'/>" turns bold OFF against a style
+        // that turns it on, which is how every ordinary run inside a bold-styled block is
+        // written; an existence test bolds all of them.
+        => (await ToMarkdownAsync($"""
+            <w:p><w:r><w:rPr><w:b w:val="{offValue}"/></w:rPr><w:t>plain</w:t></w:r></w:p>
+            """))
+            .Should().Be("plain\n");
+
+    [Fact]
+    public async Task RunWithItalicTurnedOff_IsNotItalic()
+        => (await ToMarkdownAsync("""
+            <w:p><w:r><w:rPr><w:i w:val="0"/></w:rPr><w:t>plain</w:t></w:r></w:p>
+            """))
+            .Should().Be("plain\n");
+
+    [Fact]
+    public async Task OutlineLevelNine_IsBodyTextNotASixthLevelHeading()
+        // Level 9 is ECMA-376's body text. Emitted as a heading it became "######", which
+        // looks like a deliberate deep heading rather than the mistake it was.
+        => (await ToMarkdownAsync("""
+            <w:p><w:pPr><w:outlineLvl w:val="9"/></w:pPr><w:r><w:t>Ordinary body text</w:t></w:r></w:p>
+            """))
+            .Should().Be("Ordinary body text\n");
+
     [Fact]
     public async Task Runs_SplitMidWordByWordAreRejoined()
     {

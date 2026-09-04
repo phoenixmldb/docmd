@@ -77,7 +77,7 @@ public static class HeadingAnnotator
         var properties = paragraph.Element(WordNames.W + "pPr");
 
         // Rule 1: an explicit outline level on the paragraph itself.
-        var explicitLevel = ParseInt(properties?.Element(WordNames.W + "outlineLvl"));
+        var explicitLevel = ParseOutlineLevel(properties?.Element(WordNames.W + "outlineLvl"));
         if (explicitLevel is not null)
         {
             return (explicitLevel.Value, HeadingSource.OutlineLevel);
@@ -149,7 +149,7 @@ public static class HeadingAnnotator
             return false;
         }
 
-        var allBold = runs.All(r => r.Element(WordNames.W + "rPr")?.Element(WordNames.W + "b") is not null);
+        var allBold = runs.All(r => IsToggleOn(r.Element(WordNames.W + "rPr")?.Element(WordNames.W + "b")));
         if (!allBold)
         {
             return false;
@@ -164,6 +164,34 @@ public static class HeadingAnnotator
 
         return largest >= resolver.DefaultFontHalfPoints + DirectFormatSizeMargin;
     }
+
+    /// <summary>
+    /// An outline level a paragraph or style actually declares as a heading level, or
+    /// null.
+    /// </summary>
+    /// <remarks>
+    /// ECMA-376 §17.3.1.20 gives w:outlineLvl the range 0..9 and reserves 9 for body
+    /// text, which stock Word styles set explicitly. Reading it as a level made rule 1 --
+    /// the rule the audit reports as most trustworthy -- manufacture high-confidence
+    /// headings out of ordinary prose, and the serialiser's Math.Clamp hid the evidence
+    /// by rendering them as "######" rather than as the nonsense they were.
+    /// </remarks>
+    internal static int? ParseOutlineLevel(XElement? element)
+        => ParseInt(element) is int level and >= 0 and <= 8 ? level : null;
+
+    /// <summary>
+    /// Whether an ST_OnOff toggle (w:b, w:i, ...) is on. Absent w:val means on; the four
+    /// off values are the schema's own.
+    /// </summary>
+    /// <remarks>
+    /// The element's presence is not the answer. "&lt;w:b w:val=&quot;0&quot;/&gt;" is how
+    /// Word turns bold OFF against a style that turns it on, so an existence test both
+    /// bolds text that is not bold and, here, manufactures direct-format headings out of
+    /// paragraphs that merely opted out of a bold style.
+    /// </remarks>
+    private static bool IsToggleOn(XElement? toggle)
+        => toggle is not null
+           && (string?)toggle.Attribute(WordNames.W + "val") is not ("0" or "false" or "off");
 
     private static string TextOf(XElement paragraph)
         => string.Concat(paragraph.Descendants(WordNames.W + "t").Select(t => t.Value));

@@ -91,10 +91,17 @@ public sealed class StyleResolver
                 return null;
             }
 
-            var level = ParseInt(style.Element(WordNames.W + "pPr")?.Element(WordNames.W + "outlineLvl"));
-            if (level is not null)
+            var declared = style.Element(WordNames.W + "pPr")?.Element(WordNames.W + "outlineLvl");
+            if (ParseInt(declared) is not null)
             {
-                return new OutlineLookup(level.Value, FromAncestor: hops > 0);
+                // A style that declares a level has answered the question, one way or the
+                // other. ECMA-376 §17.3.1.20 reserves 9 for body text, and stock Word
+                // styles set it -- so "9" is a style saying it is NOT a heading, which is
+                // a stronger statement than anything its w:basedOn ancestor says. The walk
+                // stops here rather than inheriting a level this style overrode.
+                return HeadingAnnotator.ParseOutlineLevel(declared) is int level
+                    ? new OutlineLookup(level, FromAncestor: hops > 0)
+                    : null;
             }
 
             current = (string?)style.Element(WordNames.W + "basedOn")?.Attribute(WordNames.W + "val");

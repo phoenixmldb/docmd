@@ -89,6 +89,48 @@ public sealed class HeadingAnnotatorTests
         paragraph.Attribute(WordNames.Docmd + "outline-level")!.Value.Should().Be("1");
     }
 
+    [Theory]
+    [InlineData("0")]
+    [InlineData("false")]
+    [InlineData("off")]
+    public void Annotate_RejectsALineWhoseBoldIsExplicitlyTurnedOff(string offValue)
+    {
+        // w:b is an ST_OnOff toggle, not a flag. "<w:b w:val='0'/>" is how Word turns bold
+        // OFF against a style that turns it on -- which is what every ordinary line inside
+        // a bold-styled block looks like -- so an existence test manufactures direct-format
+        // headings out of prose. Identical to the accepted case above except for w:val.
+        var composite = Annotate($"""
+            <w:p>
+              <w:r><w:rPr><w:b w:val="{offValue}"/><w:sz w:val="32"/></w:rPr><w:t>Maintenance Procedure</w:t></w:r>
+            </w:p>
+            """);
+
+        FirstParagraph(composite).Attribute(WordNames.Docmd + "heading-source")!.Value.Should().Be("None");
+    }
+
+    [Fact]
+    public void Annotate_TreatsOutlineLevelNineAsBodyText()
+    {
+        // ECMA-376 §17.3.1.20 reserves outline level 9 for body text, and stock Word
+        // styles set it. Read as a level it becomes rule 1 -- the rule the audit reports
+        // as most trustworthy -- inventing a high-confidence heading out of a sentence,
+        // which the serialiser's Math.Clamp then disguised as a plausible "######".
+        var composite = Annotate("""
+            <w:p><w:pPr><w:outlineLvl w:val="9"/></w:pPr><w:r><w:t>Ordinary body text</w:t></w:r></w:p>
+            """);
+
+        FirstParagraph(composite).Attribute(WordNames.Docmd + "heading-source")!.Value.Should().Be("None");
+    }
+
+    [Fact]
+    public void Annotate_AcceptsOutlineLevelEight()
+        // The other side of the boundary: 8 is the deepest real heading level and must
+        // still be one, so the guard is a range check and not an "ignore anything past 6".
+        => FirstParagraph(Annotate("""
+            <w:p><w:pPr><w:outlineLvl w:val="8"/></w:pPr><w:r><w:t>Deepest heading</w:t></w:r></w:p>
+            """))
+            .Attribute(WordNames.Docmd + "heading-source")!.Value.Should().Be("OutlineLevel");
+
     [Fact]
     public void Annotate_RejectsABoldOversizedLineEndingInAPeriod()
     {

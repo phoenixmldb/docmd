@@ -303,9 +303,15 @@
         </xsl:for-each>
       </xsl:variable>
 
+      <!--
+        w:b and w:i are ST_OnOff toggles, not flags. An existence test reads
+        <w:b w:val="0"/> as bold, and that is not a corner case: it is how Word expresses
+        "turn bold OFF against a style that turns it on", which is what every run of body
+        text inside a bold-styled block looks like.
+      -->
       <xsl:variable name="italicised" as="node()*">
         <xsl:choose>
-          <xsl:when test="w:rPr/w:i and $text ne ''">
+          <xsl:when test="w:rPr/w:i[not(@w:val = ('0','false','off'))] and $text ne ''">
             <md:em><xsl:sequence select="$innermost"/></md:em>
           </xsl:when>
           <xsl:otherwise><xsl:sequence select="$innermost"/></xsl:otherwise>
@@ -313,7 +319,7 @@
       </xsl:variable>
 
       <xsl:choose>
-        <xsl:when test="w:rPr/w:b and $text ne ''">
+        <xsl:when test="w:rPr/w:b[not(@w:val = ('0','false','off'))] and $text ne ''">
           <md:strong><xsl:sequence select="$italicised"/></md:strong>
         </xsl:when>
         <xsl:otherwise><xsl:sequence select="$italicised"/></xsl:otherwise>
