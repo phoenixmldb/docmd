@@ -16,4 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Docmd.Word/Docmd.Word.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="fixtures/**/*" CopyToOutputDirectory="PreserveNewest" LinkBase="fixtures" />
+  </ItemGroup>
 </Project>
