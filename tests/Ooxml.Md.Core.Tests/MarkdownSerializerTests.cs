@@ -89,6 +89,36 @@ public sealed class MarkdownSerializerTests
             .Should().Be("Note:  \n\\# not a heading\n");
 
     [Fact]
+    public void AdjacentDifferingFormatting_DoesNotMerge()
+        // Task 14 review: MergeAdjacentMarkup (added to rejoin a word Word's own
+        // spell-check split across two same-formatted runs) gates on the element name
+        // matching. Bold directly abutting italic, with nothing between them, must stay
+        // two separate spans -- merging across different formatting would silently change
+        // meaning, not just tidy punctuation.
+        => Serialize("""<md:para><md:strong><md:text>bold</md:text></md:strong><md:em><md:text>italic</md:text></md:em></md:para>""")
+            .Should().Be("**bold***italic*\n");
+
+    [Fact]
+    public void HardBreak_AtEndOfParagraph_TrailingSpacesSurviveTrimming()
+        // Task 14 review: TrimTrailingHorizontalWhitespace (added to drop the stray space
+        // Word/LibreOffice leaves before a paragraph mark) must stop at the '\n' a hard
+        // break emits rather than eating into it. TrimEnd(' ', '\t') halts at the first
+        // non-matching character scanning from the end, and md:br's own output ends in
+        // '\n' -- not a space -- so the two spaces immediately before it are never reached.
+        => Serialize("""<md:para><md:text>Steps:</md:text><md:br/></md:para>""")
+            .Should().Be("Steps:  \n");
+
+    [Fact]
+    public void CodeSpan_TrailingSpaceInsideBackticksSurvivesParagraphTrimming()
+        // Task 14 review: a code span's content is never escaped or altered (that is its
+        // whole purpose), and CodeSpan's own closing fence is a backtick, not a space, so
+        // even when the code span is the last thing in a paragraph, the paragraph-level
+        // trailing-whitespace trim must not reach past that backtick and eat a trailing
+        // space that is meaningful *inside* the span.
+        => Serialize("""<md:para><md:text>Run: </md:text><md:code><md:text>ls -la </md:text></md:code></md:para>""")
+            .Should().Be("Run: `ls -la `\n");
+
+    [Fact]
     public void Blockquote_PrefixesEveryLine()
         => Serialize("""<md:blockquote><md:para><md:text>Caution.</md:text></md:para></md:blockquote>""")
             .Should().Be("> Caution.\n");

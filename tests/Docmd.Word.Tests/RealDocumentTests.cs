@@ -54,9 +54,15 @@ public sealed class RealDocumentTests : IDisposable
         // not be misread as table pipes, emphasis markers, or link syntax.
         markdown.Should().Contain(@"config\|prod\*staging\_v2.yaml");
 
-        // Spell-check and rsid boundaries split runs mid-word. If they are not rejoined,
-        // words come out fragmented -- the single most visible real-document failure.
-        markdown.Should().NotMatchRegex(@"\*\*\w+\*\*\w", "runs split mid-word must be rejoined");
+        // Two adjacent same-formatting spans that failed to merge (see MergeAdjacentMarkup)
+        // serialise as four consecutive asterisks, e.g. "**conver****sion**" -- that is the
+        // real shape the bug takes, not the word-boundary regex an earlier draft of this
+        // test used, which could never match it (see Task 14 review). This document has no
+        // known split run, so this is a general safety net; the real, targeted coverage for
+        // the split-and-rejoin behaviour itself is
+        // RealDocument_RejoinsWordsSplitByProofingBoundaries, against a fixture built to
+        // carry an actual split.
+        markdown.Should().NotContain("****", "adjacent same-formatting spans must merge, not butt asterisks together");
     }
 
     [Fact]
@@ -87,16 +93,22 @@ public sealed class RealDocumentTests : IDisposable
 
         // "conversion" is split "conver" | "sion" across two w:r elements separated by
         // w:proofErr/w:bookmarkStart/w:bookmarkEnd, both runs carrying rsid attributes and
-        // identical bold formatting. If the split is not rejoined, this comes out as
-        // "**conver****sion**" -- visually similar when rendered, but fragmented in the
-        // raw text a RAG index or a human diffing the file actually sees.
+        // identical bold formatting. Unmerged, MergeAdjacentMarkup's absence would produce
+        // "**conver****sion**" -- four consecutive asterisks where the two spans meet, not
+        // the earlier draft's word-boundary regex, which could never match that shape (see
+        // Task 14 review) and was dropped rather than kept as a second, weaker check.
         markdown.Should().Contain("**conversion**", "a bold word split by proofing boundaries must rejoin");
-        markdown.Should().NotContain("conver**sion", "the split must not leak into the plain-text half");
-        markdown.Should().NotMatchRegex(@"\*\*\w+\*\*\w", "runs split mid-word must be rejoined, bold or not");
+        markdown.Should().NotContain("****", "adjacent same-formatting spans must merge, not butt asterisks together");
 
-        // A second, unformatted word is split the same way to prove the rejoin is not an
-        // artefact of the bold-merging path specifically.
-        markdown.Should().Contain("assembly", "a plain word split by proofing boundaries must rejoin");
+        // "assembly" is split "assem" | "bly" the same way, but across two PLAIN runs, with
+        // proofErr/bookmarkStart/bookmarkEnd sitting directly between them. This is not a
+        // second test of MergeAdjacentMarkup -- that function only ever touches md:strong/
+        // md:em, and two adjacent md:text nodes were always concatenated correctly by
+        // WriteInline, merge or no merge. What this actually proves is that proofErr and
+        // the bookmark elements between the two runs contribute no md-XML node at all (the
+        // stylesheet's inline dispatch never selects them), so nothing they carry -- not
+        // even a stray space -- leaks in between "assem" and "bly".
+        markdown.Should().Contain("assembly", "proofErr/bookmark noise between two plain runs must not leak text or whitespace between them");
         markdown.Should().NotContain("assem bly");
 
         // None of Word's own noise should leak into the visible text.
