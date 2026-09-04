@@ -136,6 +136,62 @@
     </md:para>
   </xsl:template>
 
+  <xsl:template match="w:tbl">
+    <md:table>
+      <xsl:for-each select="w:tr">
+        <md:row header="{if (position() eq 1) then 'true' else 'false'}">
+          <xsl:for-each select="w:tc">
+            <md:cell>
+              <!--
+                A vMerge continuation carries the visual span, not content. w:val='restart'
+                marks the cell that owns it.
+              -->
+              <xsl:if test="not(w:tcPr/w:vMerge[not(@w:val eq 'restart')])">
+                <!--
+                  Paragraphs are joined with a space: a newline inside a pipe cell would
+                  terminate the row. Nested tables are flattened here for the same reason,
+                  since GFM cannot express them, and the words matter more than the shape.
+                -->
+                <md:text>
+                  <xsl:value-of select="normalize-space(string-join(.//w:t[not(ancestor::w:del)], ' '))"/>
+                </md:text>
+              </xsl:if>
+            </md:cell>
+
+            <!--
+              gridSpan has no GFM equivalent. Emit the spanned positions as empty cells so
+              every row keeps the same width; a ragged row breaks the table entirely.
+
+              ENGINE DEFECT WORKAROUND: the brief's given "xsl:for-each select=2 to
+              xs:integer(...)" crashes PhoenixmlDb.Xslt 1.6.13 with an unhandled
+              InvalidCastException ("Unable to cast object of type
+              'System.Numerics.BigInteger' to type 'System.IConvertible'"). Reported
+              upstream (see docmd task-9-report.md); a recursive named template sidesteps
+              the buggy fast path entirely and is proven equivalent for every gridSpan
+              value tested (1, 2, 4).
+            -->
+            <xsl:call-template name="empty-span-cells">
+              <xsl:with-param name="remaining" select="xs:integer((w:tcPr/w:gridSpan/@w:val, 1)[1]) - 1"/>
+            </xsl:call-template>
+          </xsl:for-each>
+        </md:row>
+      </xsl:for-each>
+    </md:table>
+  </xsl:template>
+
+  <xsl:template name="empty-span-cells">
+    <xsl:param name="remaining" as="xs:integer"/>
+    <xsl:if test="$remaining gt 0">
+      <md:cell/>
+      <xsl:call-template name="empty-span-cells">
+        <xsl:with-param name="remaining" select="$remaining - 1"/>
+      </xsl:call-template>
+    </xsl:if>
+  </xsl:template>
+
+  <!-- A nested table is consumed by its containing cell's string-join above. -->
+  <xsl:template match="w:tbl[ancestor::w:tc]"/>
+
   <!-- Insertions are part of the accepted text; deletions are not reached at all,
        because no template selects w:del. -->
   <xsl:template match="w:ins" mode="inline">
