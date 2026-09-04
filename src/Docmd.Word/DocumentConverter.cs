@@ -82,11 +82,15 @@ public static class DocumentConverter
 
     private static async Task<string> ComputeSha256Async(string path, CancellationToken ct)
     {
-        // A plain `using`, not `await using`: FileStream's synchronous Dispose is fine
-        // here (the read itself is already async via HashDataAsync), and `await using`
-        // would insert an un-ConfigureAwait'd DisposeAsync call that CA2007 flags.
-        using var stream = File.OpenRead(path);
-        var hash = await SHA256.HashDataAsync(stream, ct).ConfigureAwait(false);
-        return Convert.ToHexStringLower(hash);
+        // Hoisted so the async dispose can be explicit about its context, matching Task
+        // 10's resolution of the identical CA2007 diagnostic in AssetRewriter.cs and
+        // FileSystemAssetSink.cs -- one idiom for "await using triggers CA2007" everywhere
+        // in this codebase, not a second one introduced here.
+        var stream = File.OpenRead(path);
+        await using (stream.ConfigureAwait(false))
+        {
+            var hash = await SHA256.HashDataAsync(stream, ct).ConfigureAwait(false);
+            return Convert.ToHexStringLower(hash);
+        }
     }
 }
