@@ -15,6 +15,10 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Docmd.Word/Docmd.Word.csproj" />
+    <!-- CommandLineTests exercises Docmd.Cli's parser directly (Task 13). CommandLine and
+         ParseResult are public rather than InternalsVisibleTo: the CLI is not a library API
+         anyone else consumes. -->
+    <ProjectReference Include="../../src/Docmd.Cli/Docmd.Cli.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="fixtures/**/*" CopyToOutputDirectory="PreserveNewest" LinkBase="fixtures" />
