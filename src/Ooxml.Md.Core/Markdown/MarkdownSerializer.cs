@@ -51,8 +51,9 @@ public static class MarkdownSerializer
         if (block.Name == MdNames.Heading)
         {
             var level = Math.Clamp(ReadInt(block, "level") ?? 1, 1, 6);
-            builder.Append(indent).Append('#', level).Append(' ');
-            WriteInline(builder, block.Nodes(), options);
+            var line = new StringBuilder();
+            WriteInline(line, block.Nodes(), options);
+            builder.Append(indent).Append('#', level).Append(' ').Append(TrimTrailingHorizontalWhitespace(line.ToString()));
             builder.Append(Newline);
         }
         else if (block.Name == MdNames.Para)
@@ -60,12 +61,22 @@ public static class MarkdownSerializer
             var line = new StringBuilder();
             WriteInline(line, block.Nodes(), options);
 
+            // Real Word/LibreOffice output routinely leaves a stray space at the very end
+            // of a paragraph's or list item's text (the space Word inserts before a
+            // paragraph mark survives into w:t). It is invisible when rendered -- a lone
+            // trailing space is not CommonMark's two-space hard break -- but it is noise
+            // in the committed file and a magnet for editors/linters that strip trailing
+            // whitespace on save, which would otherwise make a re-conversion look like a
+            // diff against nothing. Trimmed only at the very end of the assembled text, so
+            // a deliberate mid-paragraph hard break (md:br's "  \n") is untouched.
+            var trimmed = TrimTrailingHorizontalWhitespace(line.ToString());
+
             // A hard break (md:br) puts a literal '\n' inside the assembled text, so
             // whether a character is line-leading is a property of each physical line, not
             // of the paragraph as a whole. Escaping only the string's own start would leave
             // a continuation line like "- item" unescaped, and CommonMark reads that as a
             // list item interrupting the paragraph.
-            foreach (var physicalLine in line.ToString().Split(Newline))
+            foreach (var physicalLine in trimmed.Split(Newline))
             {
                 builder.Append(indent)
                        .Append(MarkdownEscaper.EscapeLineStart(physicalLine))
@@ -110,7 +121,7 @@ public static class MarkdownSerializer
 
     private static void WriteInline(StringBuilder builder, IEnumerable<XNode> nodes, MarkdownOptions options)
     {
-        foreach (var node in nodes)
+        foreach (var node in MergeAdjacentMarkup(nodes))
         {
             if (node is not XElement element)
             {
@@ -159,6 +170,50 @@ public static class MarkdownSerializer
                 builder.Append("  ").Append(Newline);
             }
         }
+    }
+
+    /// <summary>
+    /// Combines adjacent sibling md:strong/md:em elements of the same kind into one.
+    /// </summary>
+    /// <remarks>
+    /// A real Word run is not a stable unit: spell-check, grammar-check and rsid
+    /// boundaries constantly split one visually-continuous bold or italic word across two
+    /// or more w:r elements that carry identical formatting, and the stylesheet emits one
+    /// md:strong/md:em per run because it stays ignorant of Markdown text (see this file's
+    /// own header remarks). Left unmerged, "conversion" split as "conver" | "sion" would
+    /// serialise as "**conver****sion**" -- indistinguishable once rendered, but visibly
+    /// fragmented in the raw text a RAG index or a human reading the file directly
+    /// actually sees, which is the single most visible defect a real document exposes
+    /// (see docmd's real-document tests). This is a structural property of the md-XML
+    /// tree, not of any one caller, so it runs here -- inside <see cref="WriteInline"/>
+    /// itself -- and therefore applies uniformly to every block that has inline content
+    /// (paragraphs, headings, table cells, list items, link and image alt text) and
+    /// recursively to nested emphasis, without either the stylesheet or any one call site
+    /// having to know about it.
+    /// </remarks>
+    private static List<XNode> MergeAdjacentMarkup(IEnumerable<XNode> nodes)
+    {
+        var merged = new List<XNode>();
+        foreach (var node in nodes)
+        {
+            if (node is XElement element && (element.Name == MdNames.Strong || element.Name == MdNames.Em))
+            {
+                if (merged.Count > 0 && merged[^1] is XElement previous && previous.Name == element.Name)
+                {
+                    previous.Add(element.Nodes());
+                    continue;
+                }
+
+                // Copied rather than referenced: a merge target must be safe to mutate
+                // in-place without touching the mdXml document the caller owns.
+                merged.Add(new XElement(element.Name, element.Nodes()));
+                continue;
+            }
+
+            merged.Add(node);
+        }
+
+        return merged;
     }
 
     private static void WriteList(StringBuilder builder, XElement list, MarkdownOptions options, string indent)
@@ -251,7 +306,12 @@ public static class MarkdownSerializer
         {
             if (column < cells.Length)
             {
-                WriteInline(builder, cells[column].Nodes(), options);
+                // A cell built through a temporary buffer, not directly into the row, so a
+                // stray trailing space Word left in the cell's own text (the same artefact
+                // Para trims -- see its comment) does not sit next to the " | " delimiter.
+                var cell = new StringBuilder();
+                WriteInline(cell, cells[column].Nodes(), options);
+                builder.Append(TrimTrailingHorizontalWhitespace(cell.ToString()));
             }
 
             builder.Append(" | ");
@@ -260,6 +320,14 @@ public static class MarkdownSerializer
         builder.Length -= 1; // drop the trailing space
         builder.Append(Newline);
     }
+
+    /// <summary>
+    /// Strips trailing ASCII spaces and tabs only -- never '\n', so a deliberate
+    /// mid-paragraph hard break (md:br renders as two spaces then a literal '\n') is left
+    /// intact. Word/LibreOffice routinely leaves a stray space at the end of a run's text
+    /// right before the paragraph mark; this removes exactly that, and nothing else.
+    /// </summary>
+    private static string TrimTrailingHorizontalWhitespace(string text) => text.TrimEnd(' ', '\t');
 
     private static void WriteTableDelimiter(StringBuilder builder, string indent, int columnCount)
     {
