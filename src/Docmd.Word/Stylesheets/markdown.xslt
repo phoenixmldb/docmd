@@ -25,8 +25,77 @@
     </md:document>
   </xsl:template>
 
+  <xsl:variable name="numbering" select="/docmd:package/docmd:numbering/w:numbering"/>
+
+  <xsl:function name="docmd:num-id" as="xs:string">
+    <xsl:param name="p" as="element(w:p)"/>
+    <xsl:sequence select="string(($p/w:pPr/w:numPr/w:numId/@w:val, '')[1])"/>
+  </xsl:function>
+
+  <xsl:function name="docmd:ilvl" as="xs:integer">
+    <xsl:param name="p" as="element(w:p)"/>
+    <xsl:sequence select="xs:integer(($p/w:pPr/w:numPr/w:ilvl/@w:val, '0')[1])"/>
+  </xsl:function>
+
+  <!--
+    numFmt lives two hops away: w:num -> abstractNumId -> w:abstractNum -> w:lvl.
+    An undefined numId degrades to a bullet rather than failing: one malformed document
+    must never stop a corpus conversion.
+  -->
+  <xsl:function name="docmd:is-ordered" as="xs:boolean">
+    <xsl:param name="numbering" as="element()?"/>
+    <xsl:param name="numId" as="xs:string"/>
+    <xsl:param name="ilvl" as="xs:integer"/>
+    <xsl:variable name="abstractId"
+        select="string($numbering/w:num[@w:numId eq $numId]/w:abstractNumId/@w:val)"/>
+    <xsl:variable name="format"
+        select="string($numbering/w:abstractNum[@w:abstractNumId eq $abstractId]
+                                  /w:lvl[xs:integer(@w:ilvl) eq $ilvl]/w:numFmt/@w:val)"/>
+    <xsl:sequence select="$format ne '' and $format ne 'bullet' and $format ne 'none'"/>
+  </xsl:function>
+
+  <!--
+    Word stores no nesting: every item is a top-level paragraph with a numId and an ilvl.
+    group-adjacent separates list runs from body text; the recursive template below
+    rebuilds depth from ilvl.
+  -->
   <xsl:template match="w:body">
-    <xsl:apply-templates select="*"/>
+    <xsl:for-each-group select="*"
+        group-adjacent="if (self::w:p[w:pPr/w:numPr]) then docmd:num-id(.) else ''">
+      <xsl:choose>
+        <xsl:when test="current-grouping-key() ne ''">
+          <xsl:call-template name="build-list">
+            <xsl:with-param name="items" select="current-group()"/>
+            <xsl:with-param name="level" select="docmd:ilvl(current-group()[1])"/>
+          </xsl:call-template>
+        </xsl:when>
+        <xsl:otherwise>
+          <xsl:apply-templates select="current-group()"/>
+        </xsl:otherwise>
+      </xsl:choose>
+    </xsl:for-each-group>
+  </xsl:template>
+
+  <xsl:template name="build-list">
+    <xsl:param name="items" as="element(w:p)*"/>
+    <xsl:param name="level" as="xs:integer"/>
+
+    <md:list ordered="{docmd:is-ordered($numbering, docmd:num-id($items[1]), $level)}">
+      <xsl:for-each-group select="$items" group-starting-with="w:p[docmd:ilvl(.) le $level]">
+        <md:item>
+          <md:para>
+            <xsl:apply-templates select="current-group()[1]/(w:r | w:ins | w:hyperlink)" mode="inline"/>
+          </md:para>
+          <xsl:variable name="deeper" select="current-group()[position() gt 1]"/>
+          <xsl:if test="exists($deeper)">
+            <xsl:call-template name="build-list">
+              <xsl:with-param name="items" select="$deeper"/>
+              <xsl:with-param name="level" select="$level + 1"/>
+            </xsl:call-template>
+          </xsl:if>
+        </md:item>
+      </xsl:for-each-group>
+    </md:list>
   </xsl:template>
 
   <!--
@@ -34,11 +103,10 @@
     explicit priority they would all default to 0.5 and the engine is entitled to raise
     an ambiguous-rule error or silently pick either. This is not hypothetical: an empty
     paragraph that carries w:outlineLvl matches both the heading and empty-paragraph
-    patterns below. Priorities are assigned in most-specific-first order, with a gap left
-    for list suppression (priority 2), which a later task adds:
+    patterns below. Priorities are assigned in most-specific-first order:
 
       heading                    3
-      list suppression           2  (added later)
+      list suppression           2
       empty-paragraph            1
       generic paragraph          0
   -->
@@ -50,6 +118,14 @@
       <md:text><xsl:value-of select="docmd:visible-text(.)"/></md:text>
     </md:heading>
   </xsl:template>
+
+  <!--
+    A list paragraph reached by any route other than build-list (e.g. as a lone item in
+    an apply-templates fallback) produces nothing rather than a stray paragraph. The
+    w:body template above never applies-templates to a list paragraph directly, but this
+    is the safety net named in the priority ladder.
+  -->
+  <xsl:template match="w:p[w:pPr/w:numPr]" priority="2"/>
 
   <!-- Empty paragraphs are vertical spacing in Word and mean nothing here. -->
   <xsl:template match="w:p[not(normalize-space(docmd:visible-text(.)))][not(.//w:drawing)]" priority="1"/>

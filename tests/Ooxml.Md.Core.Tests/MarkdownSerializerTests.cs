@@ -136,6 +136,12 @@ public sealed class MarkdownSerializerTests
 
     [Fact]
     public void NestedList_IndentsUnderParentMarker()
+        // Corrected by Task 8 (docmd task-8-report.md): a nested list continues its parent
+        // item's own content -- indentation alone marks that, exactly as it does for every
+        // other physical line of the item -- so no blank separator precedes it. The original
+        // version of this test asserted a blank line here ("- Parent\n\n  - Child\n"), which
+        // was untested against a real multi-level list; Task 8's ThreeLevelsNest showed that
+        // rule turns a genuinely nested Word outline into a blank line per level.
         => Serialize("""
             <md:list ordered="false">
                 <md:item>
@@ -146,7 +152,7 @@ public sealed class MarkdownSerializerTests
                 </md:item>
             </md:list>
             """)
-            .Should().Be("- Parent\n\n  - Child\n");
+            .Should().Be("- Parent\n  - Child\n");
 
     [Fact]
     public void Table_TwoByTwoWithHeaderRow_EmitsPipesAndDelimiterRow()

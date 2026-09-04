@@ -31,12 +31,12 @@ public static class MarkdownSerializer
         return text.Length == 0 ? "" : text + Newline;
     }
 
-    private static void WriteBlocks(StringBuilder builder, IEnumerable<XElement> blocks, MarkdownOptions options, string indent)
+    private static void WriteBlocks(StringBuilder builder, IEnumerable<XElement> blocks, MarkdownOptions options, string indent, bool blankLineBeforeNestedList = true)
     {
         var first = true;
         foreach (var block in blocks)
         {
-            if (!first)
+            if (!first && (blankLineBeforeNestedList || block.Name != MdNames.List))
             {
                 builder.Append(Newline);
             }
@@ -176,7 +176,14 @@ public static class MarkdownSerializer
             // Continuation lines align under the marker, which is what makes nesting work.
             var childIndent = indent + new string(' ', marker.Length);
             var inner = new StringBuilder();
-            WriteBlocks(inner, item.Elements(), options, indent: "");
+
+            // A nested list sits directly under its parent item's own content -- indentation
+            // already marks the continuation unambiguously, the way it does for every other
+            // physical line of the item. Blank-separating it instead (the general rule for two
+            // sibling blocks of the same item, e.g. two paragraphs) reads as a loose list, which
+            // is exactly what Word's flat, deeply-nested numPr runs must NOT become: a genuinely
+            // nested outline blows up into a wall of blank lines, one per level.
+            WriteBlocks(inner, item.Elements(), options, indent: "", blankLineBeforeNestedList: false);
 
             var lines = inner.ToString().TrimEnd('\n').Split('\n');
             for (var i = 0; i < lines.Length; i++)
