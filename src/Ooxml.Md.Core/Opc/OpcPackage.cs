@@ -32,25 +32,42 @@ public sealed class OpcPackage : IDisposable
     public static OpcPackage Open(Stream stream, bool leaveOpen = false)
     {
         ArgumentNullException.ThrowIfNull(stream);
+
+        // OpcPackage only takes ownership of the stream on success (recorded as
+        // _ownedStream). On ANY failure path nothing else will ever dispose it, so this
+        // method -- not each caller -- must do it itself, unless the caller asked to keep
+        // owning the stream via leaveOpen. Catching only InvalidDataException covered the
+        // one failure worth a friendly message and leaked the handle on every other:
+        // ArgumentException for a stream that cannot be read, IOException for one that
+        // fails mid-header. OpenFile opens the FileStream itself, so those leaks were
+        // file handles held until the finaliser ran -- in a batch conversion, that is a
+        // process running out of handles part-way through a corpus.
+        ZipArchive archive;
         try
         {
-            var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen);
-            return new OpcPackage(archive, leaveOpen ? null : stream);
+            archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen);
         }
         catch (InvalidDataException ex)
         {
-            // OpcPackage only takes ownership of the stream on success (recorded as
-            // _ownedStream). On this failure path nothing else will ever dispose it, so
-            // this method -- not each caller -- must do it itself, unless the caller asked
-            // to keep owning the stream via leaveOpen.
-            if (!leaveOpen)
-            {
-                stream.Dispose();
-            }
-
+            DisposeUnlessBorrowed(stream, leaveOpen);
             throw new OpcFormatException(
                 "The file is not a readable OPC package. Word 97-2003 (.doc) files are a " +
                 "different, binary format; re-save as .docx.", ex);
+        }
+        catch
+        {
+            DisposeUnlessBorrowed(stream, leaveOpen);
+            throw;
+        }
+
+        return new OpcPackage(archive, leaveOpen ? null : stream);
+    }
+
+    private static void DisposeUnlessBorrowed(Stream stream, bool leaveOpen)
+    {
+        if (!leaveOpen)
+        {
+            stream.Dispose();
         }
     }
 

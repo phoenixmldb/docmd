@@ -163,4 +163,45 @@ public sealed class OpcPackageTests
             File.Delete(path);
         }
     }
+
+    /// <summary>A stream that ZipArchive will reject, and that remembers being disposed.</summary>
+    private sealed class UnreadableStream : MemoryStream
+    {
+        public bool WasDisposed { get; private set; }
+
+        public override bool CanRead => false;
+
+        protected override void Dispose(bool disposing)
+        {
+            WasDisposed = true;
+            base.Dispose(disposing);
+        }
+    }
+
+    [Fact]
+    public void Open_DisposesTheStreamWhenZipArchiveRejectsItForAReasonOtherThanBadData()
+    {
+        // Only InvalidDataException was caught, so every other construction failure left
+        // the stream undisposed. OpenFile opens the FileStream itself, so in a batch
+        // conversion that is a file handle held until the finaliser runs -- a process that
+        // runs out of handles part-way through a corpus, with nothing in the log about it.
+        var stream = new UnreadableStream();
+
+        var act = () => OpcPackage.Open(stream);
+
+        act.Should().Throw<ArgumentException>();
+        stream.WasDisposed.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Open_LeavesABorrowedStreamAloneEvenWhenItFails()
+    {
+        // leaveOpen means the caller still owns the stream; failing must not change that.
+        var stream = new UnreadableStream();
+
+        var act = () => OpcPackage.Open(stream, leaveOpen: true);
+
+        act.Should().Throw<ArgumentException>();
+        stream.WasDisposed.Should().BeFalse();
+    }
 }
