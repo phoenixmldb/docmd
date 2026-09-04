@@ -20,6 +20,11 @@ public static class FrontmatterWriter
     // guard against.
     private static readonly string[] YamlBooleans = ["y", "n", "yes", "no", "true", "false", "on", "off"];
 
+    // Both the YAML 1.1 and 1.2 core schemas resolve these (case-insensitively) as the
+    // null scalar rather than a string when left bare -- silently dropping the field's
+    // actual content on the read side, not just changing its type.
+    private static readonly string[] YamlNulls = ["~", "null"];
+
     public static string Write(DocumentProperties properties)
     {
         ArgumentNullException.ThrowIfNull(properties);
@@ -51,9 +56,10 @@ public static class FrontmatterWriter
 
     /// <summary>
     /// Quotes a scalar only when leaving it bare would change what it means: a value a
-    /// YAML parser would resolve as a number, a boolean, or a date/timestamp instead of a
-    /// string, or one carrying structural punctuation (a ": " sequence, a trailing colon,
-    /// a leading indicator character, or leading/trailing whitespace).
+    /// YAML parser would resolve as a number (decimal, hex, or sexagesimal), a boolean, a
+    /// null, or a date/timestamp instead of a string, or one carrying structural
+    /// punctuation (a ": " sequence, a trailing colon, a leading indicator character, or
+    /// leading/trailing whitespace).
     /// </summary>
     /// <remarks>
     /// Deliberately NOT "quote because the value starts with a digit" -- a SHA-256 digest
@@ -65,23 +71,122 @@ public static class FrontmatterWriter
     /// </remarks>
     private static string Quote(string value)
     {
-        var needsQuoting =
-            value.Contains(": ", StringComparison.Ordinal) ||
-            value.EndsWith(':') ||
-            value.StartsWith('#') || value.StartsWith('&') || value.StartsWith('*') ||
-            value.StartsWith('[') || value.StartsWith('{') || value.StartsWith('-') ||
-            value.StartsWith(' ') || value.EndsWith(' ') ||
-            LooksLikeYamlNumber(value) ||
-            LooksLikeYamlTimestamp(value) ||
-            YamlBooleans.Contains(value, StringComparer.OrdinalIgnoreCase);
+        // Frontmatter values are display and filter metadata, not content -- an internal
+        // line break here does not carry meaning worth preserving, and letting it through
+        // corrupts far more than the one field: a plain scalar's "key: value" line would
+        // span multiple physical lines with no key on the continuation, breaking every
+        // field that follows it, not just this one. Collapsing to a single space (rather
+        // than switching to double-quoted style for these values) keeps this function's
+        // quoting to the one style it already has -- a second style would bring its own
+        // backslash-escape rules to get wrong, inside the very function whose job is
+        // stopping things from going wrong.
+        var normalized = value
+            .Replace("\r\n", " ", StringComparison.Ordinal)
+            .Replace('\r', ' ')
+            .Replace('\n', ' ')
+            .Replace('\t', ' ');
 
-        return needsQuoting ? $"'{value.Replace("'", "''", StringComparison.Ordinal)}'" : value;
+        var needsQuoting =
+            normalized.Contains(": ", StringComparison.Ordinal) ||
+            normalized.EndsWith(':') ||
+            normalized.StartsWith('#') || normalized.StartsWith('&') || normalized.StartsWith('*') ||
+            normalized.StartsWith('[') || normalized.StartsWith('{') || normalized.StartsWith('-') ||
+            normalized.StartsWith(' ') || normalized.EndsWith(' ') ||
+            LooksLikeYamlNumber(normalized) ||
+            LooksLikeYamlHex(normalized) ||
+            LooksLikeYamlSexagesimal(normalized) ||
+            LooksLikeYamlTimestamp(normalized) ||
+            YamlBooleans.Contains(normalized, StringComparer.OrdinalIgnoreCase) ||
+            YamlNulls.Contains(normalized, StringComparer.OrdinalIgnoreCase);
+
+        return needsQuoting ? $"'{normalized.Replace("'", "''", StringComparison.Ordinal)}'" : normalized;
     }
 
-    /// <summary>A bare value that a YAML parser would resolve as an integer or a float.</summary>
+    /// <summary>A bare value that a YAML parser would resolve as a decimal integer or a float.</summary>
     private static bool LooksLikeYamlNumber(string value) =>
         long.TryParse(value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out _) ||
         double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _);
+
+    /// <summary>
+    /// A bare value shaped like a YAML 1.1 hex integer, e.g. "0x1F" -- read back as 31 by
+    /// PyYAML/SnakeYAML-style resolvers, not the string "0x1F". Neither <c>long.TryParse</c>
+    /// nor <c>double.TryParse</c> recognises this form, so it needs its own check.
+    /// </summary>
+    private static bool LooksLikeYamlHex(string value)
+    {
+        var span = value.AsSpan();
+        if (span.Length > 0 && (span[0] == '+' || span[0] == '-'))
+        {
+            span = span[1..];
+        }
+
+        if (span.Length < 3 || span[0] != '0' || (span[1] != 'x' && span[1] != 'X'))
+        {
+            return false;
+        }
+
+        foreach (var c in span[2..])
+        {
+            if (!Uri.IsHexDigit(c))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// A bare value shaped like YAML 1.1's sexagesimal (base-60) integer form, e.g. "1:30"
+    /// -- read back as 90 by PyYAML/SnakeYAML-style resolvers, not the string "1:30". The
+    /// ": " structural check above only catches a colon immediately followed by a space,
+    /// so a colon-separated number like this slips past it and needs its own shape check.
+    /// </summary>
+    private static bool LooksLikeYamlSexagesimal(string value)
+    {
+        var parts = value.Split(':');
+        if (parts.Length < 2)
+        {
+            return false;
+        }
+
+        var first = parts[0].AsSpan();
+        if (first.Length > 0 && (first[0] == '+' || first[0] == '-'))
+        {
+            first = first[1..];
+        }
+
+        if (first.IsEmpty || !IsAsciiDigitsOrUnderscores(first))
+        {
+            return false;
+        }
+
+        for (var i = 1; i < parts.Length; i++)
+        {
+            var part = parts[i];
+            if (part.Length is 0 or > 2 ||
+                !IsAsciiDigits(part.AsSpan()) ||
+                int.Parse(part, NumberStyles.None, CultureInfo.InvariantCulture) > 59)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsAsciiDigitsOrUnderscores(ReadOnlySpan<char> span)
+    {
+        foreach (var c in span)
+        {
+            if (!char.IsAsciiDigit(c) && c != '_')
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     /// <summary>
     /// A bare value shaped like a YAML timestamp: an ISO-8601 date, optionally followed by
