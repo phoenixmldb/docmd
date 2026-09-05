@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Ooxml.Md.Core/Ooxml.Md.Core.csproj" />
+    <PackageReference Include="PhoenixmlDb.Xslt" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Stylesheets/*.xslt" />
+  </ItemGroup>
+</Project>

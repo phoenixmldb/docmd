@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>docmd</AssemblyName>
+    <RootNamespace>Docmd.Cli</RootNamespace>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>docmd</ToolCommandName>
+    <PackageId>Docmd.Cli</PackageId>
+    <Description>Converts Microsoft Word documents to Markdown for AI/RAG indexing and human reading.</Description>
+    <!-- CA1303: literal strings in console output are the product's UI, not
+         localisable resources. -->
+    <NoWarn>$(NoWarn);CA1303</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Docmd.Word/Docmd.Word.csproj" />
+  </ItemGroup>
+</Project>
