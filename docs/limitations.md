@@ -6,8 +6,8 @@ so the decision to leave it can be revisited with numbers instead of guesses.
 
 **Measured, not estimated.** `TextPreservationTests.Corpus_Audit` checks that every word a
 reader sees in a `.docx` still appears in the Markdown. On the 49-document sample it was built
-against, **36 convert without losing a single word**. The entries below are what accounts for
-the other 13.
+against, **38 convert without losing a single word**. The entries below are what accounts for
+the other 11.
 
 ## Text inside transparent wrappers is dropped
 
@@ -137,41 +137,31 @@ each ruled out by measurement. A trivial stylesheet processes the same documents
 0.23 ms per paragraph, so the engine is capable of linear behaviour on this input.
 `TransformScalingTests` guards against the curve getting worse.
 
-## Adjacent emphasis spans emit ambiguous delimiter runs
+## ~~Adjacent emphasis spans emit ambiguous delimiter runs~~ — fixed
 
-**Status:** open. **Found:** the text-preservation oracle's first corpus run, 2026-09-05.
+**Status:** fixed 2026-09-05, the same day the text-preservation oracle found it.
 
-A bold run immediately followed by an italic run produces `**bold***italic*`. CommonMark reads
-the three asterisks as a *single* delimiter run, so it does not close the bold and open the
-italic; the emphasised text is swallowed into markup and disappears from the rendered document.
-
-Real example, from a 2008 program guide: the source ends a bold sentence and then sets the full
-stop in italics, which Word does routinely.
+The heading above was the first diagnosis and it was wrong. Adjacent emphasis is fine:
+`**bold***italic*` renders correctly. The defect was emphasis whose content carries **no letter
+or digit**, which breaks the moment it touches a non-space character on either side — including
+intraword, with no adjacency involved at all:
 
 ```
-source:  <w:r><w:b/><w:t>...monthly MCT Flash newsletter</w:t></w:r>
-         <w:r><w:i/><w:t>.</w:t></w:r>
-
-emitted: newsletter***.*
-
-read as: the full stop is gone
+**b***.*    renders as  b*.*         x*.*y    renders as  x*.*y
+**b***,*    renders as  b*,*         x**.**y  renders as  x**.**y
+**b***a*    renders as  bolditalic   ok, because the content is a word
 ```
 
-That single document lost 3,440 of 4,664 words to this one pattern, because bold-then-italic
-recurs throughout it. It is the largest single source of text loss measured so far.
+Word leaves a full stop italic whenever the sentence before it was italicised, which is an
+artifact of how text gets selected. One 2008 program guide lost 3,440 of its 4,664 words to the
+pattern.
 
-`MarkdigOracleTests` did not catch it: it round-trips emphasis spans one at a time, and the
-defect only exists *between* two adjacent spans.
+`MarkdownSerializer` now emits no delimiters around a span with no letters or digits, extending a
+guard that already existed for whitespace-only spans. The text is preserved exactly; only markup
+that Markdown cannot express reliably is dropped, and an italic full stop is not worth corrupting
+a sentence to attempt.
 
-**Why it is not fixed here:** the repair is a real choice, not a patch. Switching `em` to `_`
-fixes adjacency but breaks intraword emphasis, which `_` cannot express. Separating the spans
-with an empty HTML comment works in CommonMark but puts markup in the output where the document
-had none. Emitting the second span's delimiter only when the preceding character is not an
-asterisk is the narrowest fix and needs its own oracle cases. Whichever is chosen, it changes
-the bytes of every document containing adjacent emphasis, so it wants doing deliberately.
-
-**What the audit must count:** runs whose emphasis differs from the immediately preceding run's
-with no separating text, by document.
+Corpus effect: 36 of 49 documents lost no text before, 38 after.
 
 ## Text inside a text box is dropped
 

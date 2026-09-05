@@ -132,9 +132,9 @@ public sealed class TextPreservationTests : IDisposable
     /// <remarks>
     /// <para>
     /// This reports rather than gates, and the distinction is deliberate. On the 49-document
-    /// sample it was built against, 36 convert without losing a word and 13 do not, for reasons
+    /// sample it was built against, 38 convert without losing a word and 11 do not, for reasons
     /// that are real defects rather than oracle noise: text inside text boxes is never reached,
-    /// and adjacent emphasis spans emit ambiguous delimiter runs (see docs/limitations.md).
+    /// and inline content controls and fields are not descended into (see docs/limitations.md).
     /// Asserting zero loss here would be a test that cannot pass, which decays into a test
     /// nobody runs.
     /// </para>

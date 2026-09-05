@@ -187,8 +187,21 @@ public static class MarkdownSerializer
     /// behaviour, so the span arriving here with an outer space on one or both sides is
     /// the common case, not a malformed one. Emitting the whitespace outside the
     /// delimiters preserves both the words and their spacing while keeping the emphasis.
-    /// A span that is nothing but whitespace gets no delimiters at all: "****" is four
-    /// literal asterisks, and an empty emphasis carries no meaning to drop.
+    /// A span with no letters or digits in it gets no delimiters at all. Whitespace is the
+    /// obvious case ("****" is four literal asterisks), but punctuation is the one that bites:
+    /// "*.*" renders correctly in isolation and breaks the instant it touches a non-space
+    /// character, leaving the asterisks visible as text. All of these are wrong, confirmed
+    /// against Markdig:
+    /// <code>
+    /// **b***.*   renders as  b*.*        x*.*y   renders as  x*.*y
+    /// **b***,*   renders as  b*,*        x**.**y renders as  x**.**y
+    /// </code>
+    /// while the same shapes with a word inside are fine, so this is about the content and not
+    /// about adjacency. Word leaves a full stop italic whenever the sentence before it was
+    /// italicised, which is an artifact of how text gets selected rather than anything the
+    /// author meant, and one real document lost 3,440 of its 4,664 words to the pattern. The
+    /// words are what matter; an italic full stop is not expressible in Markdown and not worth
+    /// corrupting a sentence to attempt.
     /// </remarks>
     private static void WriteEmphasis(StringBuilder builder, XElement element, MarkdownOptions options, string delimiter)
     {
@@ -197,7 +210,7 @@ public static class MarkdownSerializer
         var text = inner.ToString();
 
         var trimmed = text.Trim();
-        if (trimmed.Length == 0)
+        if (!trimmed.Any(char.IsLetterOrDigit))
         {
             builder.Append(text);
             return;
