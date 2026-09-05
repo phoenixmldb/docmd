@@ -36,16 +36,37 @@
     (docs/engine-defects/2026-09-04-xslt-node-valued-parameters.md), and riding here keeps the
     transform a pure function of one input anyway.
   -->
+  <!--
+    Resolving the localised w:name means scanning every w:style definition (142 of them in the
+    document this was profiled against), and that runs for every styled paragraph AND every
+    styled run. Ordering the tests so the map is checked first matters more than it looks:
+    with no map, or with one whose keys are all styleIds, the scan is dead work. It was
+    costing 31% of the transform on a 1,000 paragraph document. The name lookup is the
+    fallback it always was; it just no longer runs when nothing can consume it.
+  -->
   <xsl:function name="docmd:style-rule" as="element()?">
     <xsl:param name="node" as="node()"/>
     <xsl:param name="styleId" as="xs:string"/>
     <xsl:variable name="map" select="root($node)/docmd:package/docmd:style-map"/>
-    <xsl:variable name="name"
-        select="string((root($node)/docmd:package/docmd:styles/w:styles
-                        /w:style[@w:styleId eq $styleId])[1]/w:name/@w:val)"/>
-    <xsl:sequence select="if ($styleId eq '') then ()
-                          else ($map/docmd:style[@key eq $styleId],
-                                $map/docmd:style[$name ne '' and @key eq $name])[1]"/>
+    <xsl:choose>
+      <xsl:when test="$styleId eq '' or empty($map/docmd:style)">
+        <xsl:sequence select="()"/>
+      </xsl:when>
+      <xsl:otherwise>
+        <xsl:variable name="byId" select="($map/docmd:style[@key eq $styleId])[1]"/>
+        <xsl:choose>
+          <xsl:when test="exists($byId)">
+            <xsl:sequence select="$byId"/>
+          </xsl:when>
+          <xsl:otherwise>
+            <xsl:variable name="name"
+                select="string((root($node)/docmd:package/docmd:styles/w:styles
+                                /w:style[@w:styleId eq $styleId])[1]/w:name/@w:val)"/>
+            <xsl:sequence select="($map/docmd:style[$name ne '' and @key eq $name])[1]"/>
+          </xsl:otherwise>
+        </xsl:choose>
+      </xsl:otherwise>
+    </xsl:choose>
   </xsl:function>
 
   <xsl:function name="docmd:para-rule" as="element()?">

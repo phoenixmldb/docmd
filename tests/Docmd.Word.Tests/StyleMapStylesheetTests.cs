@@ -60,6 +60,24 @@ public sealed class StyleMapStylesheetTests
             .Should().Be("# Scope\n");
 
     [Fact]
+    public async Task MappedStyle_PrefersTheStyleIdOverTheName()
+    {
+        // Both could match here. The id wins, because it is the unambiguous one: names are
+        // localised and two styles may share one. docmd:style-rule only consults the name once
+        // the id has missed, which is both the cheaper order and the correct precedence -- and
+        // nothing pinned that precedence until this test.
+        var markdown = await ConvertAsync(
+            Para("Alpha", "Scope"),
+            """
+            Alpha: { as: heading, level: 3 }
+            Beta:  { as: heading, level: 5 }
+            """,
+            """<w:style w:styleId="Alpha"><w:name w:val="Beta"/></w:style>""");
+
+        markdown.Should().Be("### Scope\n");
+    }
+
+    [Fact]
     public async Task MappedList_GroupsConsecutiveItemsIntoOneList()
     {
         // The reason mapped list kinds join the numbering grouping key rather than emitting a
