@@ -264,4 +264,47 @@ public sealed class MarkdownSerializerTests
             </md:table>
             """)
             .Should().Be("|  |  |\n| --- | --- |\n| 1 | 2 |\n");
+
+    [Fact]
+    public void Emphasis_OnPunctuationAlone_IsDropped()
+        // Word leaves a full stop italic when the sentence before it was italicised, which is
+        // an artifact of selection rather than authorial intent. Markdown cannot express it:
+        // "*.*" is fine alone but breaks the moment it touches a non-space character, and the
+        // asterisks then survive as literal text. The words matter; the italic full stop does
+        // not. Found by the text-preservation oracle on a real 2008 program guide, which lost
+        // 3,440 of 4,664 words to this one pattern.
+        => Serialize("""<md:para><md:em><md:text>.</md:text></md:em></md:para>""")
+            .Should().Be(".\n");
+
+    [Fact]
+    public void Emphasis_AfterAnotherSpan_SurvivesWhenItHasWords()
+        // The narrow rule matters: adjacent emphasis is NOT broken in general, so this must
+        // keep its markup. Only content with no letter or digit is dropped.
+        => Serialize("""
+            <md:para><md:strong><md:text>bold</md:text></md:strong><md:em><md:text>italic</md:text></md:em></md:para>
+            """)
+            .Should().Be("**bold***italic*\n");
+
+    [Fact]
+    public void StrongFollowedByAnItalicFullStop_KeepsTheFullStop()
+    {
+        // The exact real-world shape. Emitting "**newsletter***.*" renders as
+        // "newsletter*.*" -- the asterisks visible, the sentence corrupted.
+        var markdown = Serialize("""
+            <md:para><md:strong><md:text>newsletter</md:text></md:strong><md:em><md:text>.</md:text></md:em></md:para>
+            """);
+
+        markdown.Should().Be("**newsletter**.\n");
+    }
+
+    [Fact]
+    public void Emphasis_OnASymbolAlone_IsDropped()
+        => Serialize("""<md:para><md:strong><md:text>&#8594;</md:text></md:strong></md:para>""")
+            .Should().Be("\u2192\n");
+
+    [Fact]
+    public void Emphasis_OnADigit_IsKept()
+        // "no letters or digits", not "no letters": a bold figure is meaningful.
+        => Serialize("""<md:para><md:strong><md:text>5</md:text></md:strong></md:para>""")
+            .Should().Be("**5**\n");
 }
