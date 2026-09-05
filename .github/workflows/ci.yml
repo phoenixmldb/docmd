@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A second push to a branch cancels the first: the older run's answer is about code nobody
+# is looking at any more.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      # The performance gate budgets each transform in wall-clock time. A shared runner is
+      # slower and noisier than a workstation, so the budget is raised here; the assertion
+      # that actually detects a regression is a ratio and is unaffected.
+      DOCMD_PERF_BUDGET_MS: 90000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # The engines depend on ICU for normalize-unicode(), UCA collations and regex
+      # character classes. DOTNET_SYSTEM_GLOBALIZATION_INVARIANT overrides the
+      # InvariantGlobalization=false in Directory.Build.props and produces WRONG ANSWERS
+      # rather than errors, so assert it is unset rather than trusting the image.
+      - name: Refuse to build without ICU
+        run: |
+          if [ -n "${DOTNET_SYSTEM_GLOBALIZATION_INVARIANT:-}" ]; then
+            echo "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT is set; docmd produces incorrect"
+            echo "output under invariant globalization. Refusing to build."
+            exit 1
+          fi
+          echo "ICU globalization: ok"
+
+      # --locked-mode is the point of committing packages.lock.json: it fails rather than
+      # silently resolving a transitive dependency to something new. A lock file that is
+      # never enforced is a file, not a lock.
+      - name: Restore (locked)
+        run: dotnet restore docmd.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build docmd.slnx --no-restore -c Release
+
+      # The performance gate is excluded here and run alone below. Timing a transform while
+      # another test assembly saturates the CPU measures the runner, not the code, and it
+      # flaked about one run in four when they shared a process.
+      - name: Test
+        run: >
+          dotnet test docmd.slnx --no-build -c Release --verbosity normal
+          --filter "FullyQualifiedName!~TransformScaling"
+
+      - name: Performance gate
+        run: >
+          dotnet test tests/Docmd.Word.Tests --no-build -c Release --verbosity normal
+          --filter "FullyQualifiedName~TransformScaling"
+
+      # Proves the tool actually runs, which building a library does not. A packaging or
+      # embedded-resource mistake shows up here and nowhere else in this job.
+      - name: Smoke test the CLI
+        run: |
+          dotnet run --project src/Docmd.Cli --no-build -c Release -- --version
+          dotnet run --project src/Docmd.Cli --no-build -c Release -- --print-stylesheet \
+            | python3 -c "import sys, xml.dom.minidom; xml.dom.minidom.parseString(sys.stdin.read()); print('stylesheet parses')"

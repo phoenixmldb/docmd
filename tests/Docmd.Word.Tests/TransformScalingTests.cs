@@ -38,7 +38,17 @@ using Xunit;
 public sealed class TransformScalingTests
 {
     private const string W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-    private const int Budget = 25_000;
+    /// <summary>
+    /// Wall-clock budget for a single transform. Overridable because the value is a trade
+    /// between two failure modes: too low and a slow or loaded CI runner fails a healthy
+    /// build, which costs more trust than the gate is worth; too high and a genuine hang
+    /// takes longer to report. CI raises it. Detection does not depend on this number -- the
+    /// ratio assertion below catches the regression either way, just less quickly.
+    /// </summary>
+    private static readonly int Budget =
+        int.TryParse(Environment.GetEnvironmentVariable("DOCMD_PERF_BUDGET_MS"), out var ms)
+            ? ms
+            : 25_000;
 
     private static string Composite(int paragraphs)
     {
@@ -77,7 +87,8 @@ public sealed class TransformScalingTests
         if (await Task.WhenAny(work, Task.Delay(Budget)).ConfigureAwait(false) != work)
         {
             Assert.Fail(
-                $"Transforming {paragraphs} paragraphs of plain text exceeded {Budget / 1000}s. "
+                $"Transforming {paragraphs} paragraphs of plain text exceeded {Budget / 1000}s "
+                + "(override with DOCMD_PERF_BUDGET_MS). "
                 + "It took about 3 seconds for 1000 when this gate was written, so this is a "
                 + "catastrophic regression rather than drift. The known cause is chained "
                 + "predicates in a match pattern: see "
@@ -88,28 +99,41 @@ public sealed class TransformScalingTests
         return Math.Max(sw.ElapsedMilliseconds, 1);
     }
 
-    private static async Task<long> MillisecondsForAsync(int paragraphs)
+    /// <summary>
+    /// Measures both sizes interleaved, taking the minimum of each.
+    /// </summary>
+    /// <remarks>
+    /// Measuring the two sizes in sequence flaked roughly one run in four: a load spike
+    /// landing during the large measurements alone inflates the ratio, and the gate reports a
+    /// complexity regression that is not there. Interleaving means transient load hits both
+    /// sizes, so it largely cancels in the ratio; the minimum of several rounds then discards
+    /// what remains. A gate that cries wolf at that rate is worse than no gate, because it
+    /// trains people to ignore a red build.
+    /// </remarks>
+    private static async Task<(long Small, long Large)> MeasureAsync()
     {
-        var composite = XDocument.Parse(Composite(paragraphs), LoadOptions.PreserveWhitespace);
-        var best = long.MaxValue;
-        for (var attempt = 0; attempt < 2; attempt++)
+        var small = XDocument.Parse(Composite(250), LoadOptions.PreserveWhitespace);
+        var large = XDocument.Parse(Composite(1000), LoadOptions.PreserveWhitespace);
+
+        // The first transform in a process pays JIT, which at these sizes is larger than the
+        // thing being measured.
+        await TimeOneAsync(XDocument.Parse(Composite(50), LoadOptions.PreserveWhitespace), 50)
+            .ConfigureAwait(false);
+
+        long bestSmall = long.MaxValue, bestLarge = long.MaxValue;
+        for (var round = 0; round < 3; round++)
         {
-            best = Math.Min(best, await TimeOneAsync(composite, paragraphs).ConfigureAwait(false));
+            bestLarge = Math.Min(bestLarge, await TimeOneAsync(large, 1000).ConfigureAwait(false));
+            bestSmall = Math.Min(bestSmall, await TimeOneAsync(small, 250).ConfigureAwait(false));
         }
 
-        return best;
+        return (bestSmall, bestLarge);
     }
 
     [Fact]
     public async Task TransformCost_GrowsNoWorseThanLinearly()
     {
-        // Warm up small: the first transform in a process pays JIT, which at these sizes is
-        // larger than the thing being measured.
-        await MillisecondsForAsync(50);
-
-        // Large first, so the catastrophic case fails without measuring anything else.
-        var large = await MillisecondsForAsync(1000);
-        var small = await MillisecondsForAsync(250);
+        var (small, large) = await MeasureAsync();
 
         ((double)large / small).Should().BeLessThan(
             10.0,
