@@ -14,8 +14,13 @@
     <Authors>Endpoint Systems</Authors>
     <Company>Endpoint Systems</Company>
     <Product>docmd</Product>
-    <Copyright>Copyright © Endpoint Systems 2026. All rights reserved.</Copyright>
+    <!-- Not "all rights reserved": docmd's core is Apache-2.0, and that boilerplate
+         contradicts the licence it ships under. -->
+    <Copyright>Copyright © Endpoint Systems 2026</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/endpointsystems/docmd</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/endpointsystems/docmd</PackageProjectUrl>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <!-- Deterministic in every configuration, not just Release: docmd's own output

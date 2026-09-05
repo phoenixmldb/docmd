@@ -1,0 +1,85 @@
+{
+  "version": 2,
+  "dependencies": {
+    "net10.0": {
+      "PhoenixmlDb.Xslt": {
+        "type": "Direct",
+        "requested": "[1.6.13, )",
+        "resolved": "1.6.13",
+        "contentHash": "8dZ1dt3wVE29LuNB6Fdjd2mmU/huyBHpynZ9kE5xt2y+nJ/lFrOdDzqZD4nvF0gHJKNPlunv7zXxHAiWMJzqJQ==",
+        "dependencies": {
+          "PhoenixmlDb.Core": "1.6.7",
+          "PhoenixmlDb.XQuery": "1.6.12"
+        }
+      },
+      "Antlr4.Runtime.Standard": {
+        "type": "Transitive",
+        "resolved": "4.13.1",
+        "contentHash": "Da5+i4kFHUseJRZGcBG5fmZGpA/Ns180ibrQMxgZzjpQOnENVvSL5gi5HZ8Ncz8/AR2WsKbOg2lMBzjz0HUQcA=="
+      },
+      "J2N": {
+        "type": "Transitive",
+        "resolved": "2.0.0",
+        "contentHash": "M5bwDajAARZiyqupU+rHQJnsVLxNBOHJ8vKYHd8LcLIb1FgLfzzcJvc31Qo5Xz/GEHFjDF9ScjKL/ks/zRTXuA=="
+      },
+      "Lucene.Net": {
+        "type": "Transitive",
+        "resolved": "4.8.0-beta00016",
+        "contentHash": "DCtUbE/NIrisNI7hRwU+UKS3Cr6S2vH1XB9wvEHHI3anu5OUpX1Fkr/PDC7oFCaol/QCvzVLbLZVizAT1aTLpA==",
+        "dependencies": {
+          "J2N": "2.0.0",
+          "Microsoft.Extensions.Configuration.Abstractions": "2.0.0"
+        }
+      },
+      "Lucene.Net.Analysis.Common": {
+        "type": "Transitive",
+        "resolved": "4.8.0-beta00016",
+        "contentHash": "7pjEAIliWdih6E3I0hCE8hKcKKRx1LLzeQBslF1fhvzE1Sal4NyHd8RFJHV1Z+yHlBw4gCyyVIDZADiIoyqwxg==",
+        "dependencies": {
+          "Lucene.Net": "4.8.0-beta00016"
+        }
+      },
+      "Microsoft.Extensions.Configuration.Abstractions": {
+        "type": "Transitive",
+        "resolved": "2.0.0",
+        "contentHash": "rHFrXqMIvQNq51H8RYTO4IWmDOYh8NUzyqGlh0xHWTP6XYnKk7Ryinys2uDs+Vu88b3AMlM3gBBSs78m6OQpYQ==",
+        "dependencies": {
+          "Microsoft.Extensions.Primitives": "2.0.0"
+        }
+      },
+      "Microsoft.Extensions.Primitives": {
+        "type": "Transitive",
+        "resolved": "2.0.0",
+        "contentHash": "ukg53qNlqTrK38WA30b5qhw0GD7y3jdI9PHHASjdKyTcBHTevFM2o23tyk3pWCgAV27Bbkm+CPQ2zUe1ZOuYSA=="
+      },
+      "PhoenixmlDb.Core": {
+        "type": "Transitive",
+        "resolved": "1.6.7",
+        "contentHash": "8MOmyLoeAOLuXKzRhtQS7y8h6EM8rrLpIfhYyV4a4yX1DoDIR+VU0ExDyOGdwQ77HOTP6HaVVC4azaJw6xvK0A=="
+      },
+      "PhoenixmlDb.XQuery": {
+        "type": "Transitive",
+        "resolved": "1.6.12",
+        "contentHash": "s5Vl563ImRMATdXgy+lhND2SQS+0CkPzCt0mGpEvCF9ObvXPh9vTOm/89y8uEd8Zs4CpBCRDnvuJkTWcHYZxLg==",
+        "dependencies": {
+          "Antlr4.Runtime.Standard": "4.13.1",
+          "Lucene.Net": "4.8.0-beta00016",
+          "Lucene.Net.Analysis.Common": "4.8.0-beta00016",
+          "PhoenixmlDb.Core": "1.6.7"
+        }
+      },
+      "ooxml.md.core": {
+        "type": "Project",
+        "dependencies": {
+          "YamlDotNet": "[18.1.0, )"
+        }
+      },
+      "YamlDotNet": {
+        "type": "CentralTransitive",
+        "requested": "[18.1.0, )",
+        "resolved": "18.1.0",
+        "contentHash": "5K+9KFg2TdTl7VXv88Qzi/0lqK6JFoNP3lRuImPYGRV7K/QYklDyTrj4+A+KAki1JsQi6qKY+hDyY7d6WRqjrw=="
+      }
+    }
+  }
+}

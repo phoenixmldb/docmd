@@ -6,3 +6,5 @@ nupkg-out/
 .vs/
 .idea/
 .superpowers/
+__pycache__/
+*.pyc

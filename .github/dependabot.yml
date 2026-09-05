@@ -1,0 +1,55 @@
+version: 2
+
+# Pins go stale silently. Nothing in a NuGet reference tells you a newer version shipped, so
+# a repo drifts until someone needs a fix badly enough to look -- and across this workspace
+# the repos that are badly behind are exactly the ones nobody has touched recently.
+#
+# Dependabot is the signal. It reads Directory.Packages.props (central package management)
+# and opens a PR when something moves, so being behind becomes a decision someone declined
+# rather than a fact nobody noticed.
+#
+# Renovate is the upgrade path if this gets noisy: it groups and auto-merges more flexibly,
+# at the cost of installing a GitHub App. Dependabot needs nothing but this file.
+
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+
+    groups:
+      # One PR for the whole first-party engine surface. These move together and are the
+      # ones worth staying current on -- bug fixes in the XSLT engine land here.
+      phoenixml-engine:
+        patterns:
+          - "PhoenixmlDb.*"
+
+      # Test tooling churns often and rarely interestingly. One PR, not six.
+      test-tooling:
+        patterns:
+          - "xunit*"
+          - "Microsoft.NET.Test.Sdk"
+          - "coverlet*"
+
+    ignore:
+      # FluentAssertions 7.x and 8.x moved to the paid Xceed licence. docmd's core is
+      # Apache-2.0 and 6.12.2 is the last release under MIT, so this pin is a licensing
+      # decision, not a staleness one. Without this entry Dependabot would helpfully open a
+      # PR to relicense the test suite.
+      - dependency-name: "FluentAssertions"
+        versions: [">=7.0.0"]
+
+      # Markdig is the differential oracle's independent implementation. Bumping it changes
+      # what "an independent parser agrees" means, so it is worth a deliberate look rather
+      # than an automatic merge -- but a major bump is still worth being told about.
+      - dependency-name: "Markdig"
+        update-types: ["version-update:semver-patch"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
