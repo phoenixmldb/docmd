@@ -12,6 +12,10 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="FluentAssertions" />
+    <!-- The text-preservation oracle reads docmd's output with an independent Markdown
+         implementation, so a bug in our own serialiser cannot hide a bug in the transform.
+         Test-only; Markdig never ships in the product. -->
+    <PackageReference Include="Markdig" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Docmd.Word/Docmd.Word.csproj" />
