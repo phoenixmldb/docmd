@@ -290,7 +290,16 @@
   </xsl:template>
 
   <!-- Empty paragraphs are vertical spacing in Word and mean nothing here. -->
-  <xsl:template match="w:p[not(normalize-space(docmd:visible-text(.)))][not(.//w:drawing)]" priority="1"/>
+  <!--
+    ONE predicate, not two, and that is a performance contract rather than a style choice.
+    Two chained predicates on a match pattern cost this engine a document wide scan per
+    candidate node, making the whole transform quadratic: on a synthetic 500 paragraph
+    document the two predicate form runs at 54.1 ms per paragraph and this one at 0.32,
+    a factor of 169. Joining them with "and" is semantically identical here because neither
+    predicate is positional. Engine defect: docs/engine-defects/2026-09-05-xslt-chained-predicates-in-match-patterns.md
+  -->
+  <xsl:template match="w:p[not(normalize-space(docmd:visible-text(.))) and not(.//w:drawing)]"
+                priority="1"/>
 
   <xsl:template match="w:p" priority="0">
     <md:para>
