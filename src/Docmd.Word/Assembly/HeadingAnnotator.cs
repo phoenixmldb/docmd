@@ -56,7 +56,15 @@ public static class HeadingAnnotator
         // depend on it.
         foreach (var paragraph in body.Descendants(WordNames.W + "p"))
         {
-            var (level, source) = Detect(paragraph, resolver);
+            // A paragraph inside a table cell is cell content, not document structure, and it
+            // cannot become a heading whatever it looks like: the table template reads cell text
+            // with string-join and never applies templates to these paragraphs. Detecting one
+            // anyway was not harmless. It spent a slug, so a real heading further down took
+            // "overview-1" while nothing in the document explained where "overview" had gone --
+            // and Plan 2's review-companion cross-links are built on these slugs.
+            var (level, source) = paragraph.Ancestors(WordNames.W + "tc").Any()
+                ? (0, HeadingSource.None)
+                : Detect(paragraph, resolver);
 
             paragraph.SetAttributeValue(WordNames.Docmd + "heading-source", source.ToString());
 

@@ -46,10 +46,14 @@ already dead, while the anchor text survives. Recorded so the corpus audit can r
   renumbers from the top. `md:list/@start` exists in the vocabulary and is never emitted.
 - Two media parts sharing a file name overwrite each other — `AssetRewriter` keys the output path
   on the file name alone.
-- `HeadingAnnotator` walks `Descendants(w:p)`, which reaches paragraphs inside table cells. The
-  annotation is inert for output, but it still advances `Slugger`'s dedup counter, so real headings
-  can acquire unexplained `-1` suffixes. **Plan 2's review-companion cross-links depend on these
-  slugs**, so fix this before building them.
+- ~~`HeadingAnnotator` walks `Descendants(w:p)`, which reaches paragraphs inside table cells...
+  advances `Slugger`'s dedup counter, so real headings acquire unexplained `-1` suffixes.~~
+  **Fixed.** A paragraph inside a `w:tc` is now detected as `None` and spends no slug: it is cell
+  content, not document structure, and the table template reads cell text with `string-join`
+  without ever applying templates to it, so it could never have become a heading anyway. Output
+  is byte-identical across the 32-document corpus, because `md:heading/@slug` is still emitted
+  and unused — which is exactly why this had to be fixed *before* the review companion starts
+  consuming it rather than after.
 - A new `XsltTransformer` is constructed and the stylesheet recompiled per document. Correct, but
   it will dominate cost once batch mode exists.
 - `md:heading/@slug` is emitted and unused today. It is Plan 2's cross-link key, not dead weight.
