@@ -18,7 +18,7 @@ fixed opinions, and the Python ecosystem's tools (`unstructured`, `docling`) are
 inside a .NET pipeline. Cloud document-intelligence APIs solve a different problem at a different
 price, and hand the customer no artifact they own.
 
-Endpoint Systems owns a 97.9%-conformant XSLT 4.0 engine. A `.docx` is a ZIP of XML parts. The
+Endpoint Systems owns an XSLT 4.0 engine with high W3C conformance (94.3% against XSLT 3.0, measured 2026-09-04 — a figure that moves as the suite and the engine move, so cite the measurement date with it). A `.docx` is a ZIP of XML parts. The
 conversion is therefore a transform problem against an engine we already ship — which is both the
 technical fit and the commercial reason this product is ours to build.
 
