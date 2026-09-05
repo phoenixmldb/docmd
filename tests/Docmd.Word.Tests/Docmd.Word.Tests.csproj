@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <!-- Analyzer rules tuned for shipping libraries fight ordinary test code
+         (CA1707 underscores in test names, CA2007 ConfigureAwait). -->
+    <AnalysisLevel>none</AnalysisLevel>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="FluentAssertions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Docmd.Word/Docmd.Word.csproj" />
+    <!-- CommandLineTests exercises Docmd.Cli's parser directly (Task 13). CommandLine,
+         ParseResult and CommandKind stay internal; Docmd.Cli's AssemblyInfo.cs grants this
+         assembly access via InternalsVisibleTo rather than widening the Exe project's public
+         surface (CA1515) for types nobody outside this test project consumes. -->
+    <ProjectReference Include="../../src/Docmd.Cli/Docmd.Cli.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="fixtures/**/*" CopyToOutputDirectory="PreserveNewest" LinkBase="fixtures" />
+  </ItemGroup>
+</Project>

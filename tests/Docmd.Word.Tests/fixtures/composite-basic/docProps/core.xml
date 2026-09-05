@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cp:coreProperties
+    xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:dcterms="http://purl.org/dc/terms/">
+  <dc:title>Q3 Safety Review</dc:title>
+  <dc:creator>A. Whitfield</dc:creator>
+  <dcterms:created xsi:type="dcterms:W3CDTF" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">2026-04-11T09:14:00Z</dcterms:created>
+</cp:coreProperties>

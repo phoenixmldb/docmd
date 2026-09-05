@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hand-authored, not exported. LibreOffice never emits w:proofErr, w:rsid*, or
+  w:bookmarkStart/End, and it never splits a word's own characters across two adjacent
+  w:r runs the way Word's spell-check and grammar-check constantly do. See
+  tests/Docmd.Word.Tests/RealDocumentTests.cs and the Task 14 commit message for why this
+  fixture exists alongside the genuine fixtures/real/sample.docx.
+-->
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p w:rsidR="00A1B2C3" w:rsidRDefault="00A1B2C3" w:rsidP="00A1B2C3">
+      <w:pPr><w:pStyle w:val="Heading1"/></w:pPr>
+      <w:r w:rsidR="00A1B2C3"><w:t>Vent Assembly Inspection Notes</w:t></w:r>
+    </w:p>
+
+    <!--
+      "conversion" split bold across two w:r, with proofErr and a bookmark between the
+      halves and differing rsid attributes on each run, exactly the shape a spell-check
+      boundary leaves behind, and none of it should survive into the visible text.
+    -->
+    <w:p w:rsidR="00B2C3D4" w:rsidRDefault="00C3D4E5" w:rsidP="00B2C3D4">
+      <w:r w:rsidR="00B2C3D4"><w:t xml:space="preserve">The pump requires a full </w:t></w:r>
+      <w:proofErr w:type="spellStart"/>
+      <w:bookmarkStart w:id="0" w:name="_Hlk00000001"/>
+      <w:r w:rsidR="00B2C3D4"><w:rPr><w:b/></w:rPr><w:t>conver</w:t></w:r>
+      <w:bookmarkEnd w:id="0"/>
+      <w:r w:rsidR="00C3D4E5" w:rsidRPr="00C3D4E5"><w:rPr><w:b/></w:rPr><w:t>sion</w:t></w:r>
+      <w:proofErr w:type="spellEnd"/>
+      <w:r w:rsidR="00B2C3D4"><w:t xml:space="preserve"> before it can be re-certified.</w:t></w:r>
+    </w:p>
+
+    <!--
+      "assembly" split across two plain (unformatted) w:r, same proofing/bookmark noise,
+      proving the rejoin is not an artefact of the bold-merge path specifically.
+    -->
+    <w:p w:rsidR="00D4E5F6" w:rsidRDefault="00D4E5F6" w:rsidP="00D4E5F6">
+      <w:r w:rsidR="00D4E5F6"><w:t xml:space="preserve">Inspect the vent </w:t></w:r>
+      <w:proofErr w:type="spellStart"/>
+      <w:r w:rsidR="00D4E5F6"><w:t>assem</w:t></w:r>
+      <w:bookmarkStart w:id="1" w:name="_Hlk00000002"/>
+      <w:bookmarkEnd w:id="1"/>
+      <w:r w:rsidR="00E5F607"><w:t>bly</w:t></w:r>
+      <w:proofErr w:type="spellEnd"/>
+      <w:r w:rsidR="00D4E5F6"><w:t xml:space="preserve"> for corrosion before reinstallation.</w:t></w:r>
+    </w:p>
+
+    <!--
+      A run containing nothing but a space, sitting between two bold runs. This is what
+      Word emits between a bold phrase and the next bold word whenever a proofing or rsid
+      boundary falls on the space itself, and it is the shape that XDocument.Parse's
+      default LoadOptions destroyed: whitespace-only text nodes were silently discarded,
+      welding the two words into "**Safety****Review**".
+    -->
+    <w:p w:rsidR="00071829" w:rsidRDefault="00071829">
+      <w:r w:rsidR="00071829"><w:rPr><w:b/></w:rPr><w:t>Safety</w:t></w:r>
+      <w:r w:rsidR="00071829"><w:t xml:space="preserve"> </w:t></w:r>
+      <w:r w:rsidR="00182930"><w:rPr><w:b/></w:rPr><w:t>Review</w:t></w:r>
+      <w:r w:rsidR="00071829"><w:t xml:space="preserve"> is overdue.</w:t></w:r>
+    </w:p>
+
+    <!--
+      A third paragraph: grammar-check noise and a bookmark spanning ordinary,
+      already-whole words, proving the converter tolerates the noise even when it is not
+      sitting on a split.
+    -->
+    <w:p w:rsidR="00F60718" w:rsidRDefault="00F60718">
+      <w:bookmarkStart w:id="2" w:name="_Hlk00000003"/>
+      <w:proofErr w:type="gramStart"/>
+      <w:r w:rsidR="00F60718"><w:t>Re-torque the mounting bolts</w:t></w:r>
+      <w:proofErr w:type="gramEnd"/>
+      <w:r w:rsidR="00F60718"><w:t xml:space="preserve"> to the value on the plate.</w:t></w:r>
+      <w:bookmarkEnd w:id="2"/>
+    </w:p>
+  </w:body>
+</w:document>

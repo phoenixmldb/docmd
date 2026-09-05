@@ -5,3 +5,4 @@ artifacts/
 nupkg-out/
 .vs/
 .idea/
+.superpowers/

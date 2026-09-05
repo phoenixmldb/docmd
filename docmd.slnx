@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="src/Ooxml.Md.Core/Ooxml.Md.Core.csproj" />
+  <Project Path="src/Docmd.Word/Docmd.Word.csproj" />
+  <Project Path="src/Docmd.Cli/Docmd.Cli.csproj" />
+  <Project Path="tests/Ooxml.Md.Core.Tests/Ooxml.Md.Core.Tests.csproj" />
+  <Project Path="tests/Docmd.Word.Tests/Docmd.Word.Tests.csproj" />
+</Solution>
