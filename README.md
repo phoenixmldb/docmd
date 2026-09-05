@@ -112,6 +112,43 @@ $ docmd --print-stylesheet > mine.xslt
 $ docmd report.docx --stylesheet mine.xslt
 ```
 
+If you do not want to write XSLT, a style map covers the common case — telling docmd what your
+template's own styles mean:
+
+```yaml
+# house-styles.yaml
+CautionNote:   { as: blockquote, prefix: "Caution: " }
+ProcedureStep: { as: ordered-list-item }
+PartNumber:    { as: inline-code }
+CorpTitle:     { as: heading, level: 1 }
+```
+
+```console
+$ docmd report.docx --style-map house-styles.yaml
+```
+
+Keys match a `w:styleId` or the style name Word shows in its UI, whichever you have.
+Paragraph styles take `heading` (with `level`), `blockquote`, `list-item`, `ordered-list-item`,
+`code-block` and `para`; character styles take `inline-code`, `strong` and `em`. A `prefix` is
+literal text and is escaped like any other document text — for Markdown in a prefix, use a
+stylesheet. It applies to `heading`, `blockquote`, `code-block` and `para`; on a list or
+character style it is refused rather than accepted and dropped, so a map that parses is a map
+that does what it says.
+
+A mapped style beats what docmd would have inferred, so `Heading1: { as: para }` demotes a
+heading on purpose. And because a map fails silently by nature — a misspelled style id just never
+matches — docmd reports both directions:
+
+```
+! style map: 'CorpTitel' matched no style in this document.
+? style map: 'Style17 (Corporate Heading)' is used 24 time(s) and is not mapped.
+```
+
+The first line is a typo. The second is the conversation: it names the styles your documents
+actually lean on, so you can decide what is worth mapping instead of guessing. It counts only
+the uses docmd left alone — a style it already read as a heading is not a gap in your map — and
+it stays quiet unless you passed a map, since it is advice about a feature you asked for.
+
 `src/Docmd.Word/Stylesheets/markdown.xslt` is the whole semantic-recovery layer: which paragraph
 is a heading, which run is bold, how a Word list becomes a Markdown one. It is about 350 lines and
 it is meant to be read.
@@ -126,7 +163,7 @@ of editing XSLT rather than filing a feature request.
 
 ## What it does not do yet
 
-`--review`, `-r`/`--recursive`, `docmd audit`, `--style-map`, `--strict` and `--report` are on the
+`--review`, `-r`/`--recursive`, `docmd audit`, `--strict` and `--report` are on the
 roadmap and **fail cleanly today** rather than silently doing nothing. See
 [`docs/deferred-work.md`](docs/deferred-work.md) for what is inherited and why, and
 [`docs/limitations.md`](docs/limitations.md) for what is knowingly dropped.

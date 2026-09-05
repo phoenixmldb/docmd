@@ -2,6 +2,7 @@ namespace Docmd.Cli;
 
 using Docmd.Word;
 using Ooxml.Md.Core.Markdown;
+using Ooxml.Md.Core.StyleMapping;
 
 internal enum CommandKind { Convert, Audit, Register, License, Help, Version, PrintStylesheet }
 
@@ -58,6 +59,7 @@ internal static class CommandLine
         var flavour = MarkdownFlavour.Gfm;
         var imageDirectory = "img";
         string? stylesheetPath = null;
+        var styleMap = StyleMap.Empty;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -129,6 +131,29 @@ internal static class CommandLine
                     }
 
                     break;
+                case "--style-map":
+                    if (!TryTake(args, ref i, out var styleMapPath))
+                    {
+                        return Fail($"{argument} requires a path.");
+                    }
+
+                    if (!File.Exists(styleMapPath))
+                    {
+                        return Fail($"Style map not found: {styleMapPath}");
+                    }
+
+                    try
+                    {
+                        styleMap = StyleMap.Parse(File.ReadAllText(styleMapPath));
+                    }
+                    catch (StyleMapException ex)
+                    {
+                        // Parsed here rather than deep in the pipeline so a typo in hand-written
+                        // configuration fails on the argument, before any document is touched.
+                        return Fail(ex.Message);
+                    }
+
+                    break;
                 case "--img-dir":
                     if (!TryTake(args, ref i, out imageDirectory!))
                     {
@@ -183,6 +208,7 @@ internal static class CommandLine
             Flavour = flavour,
             ImageDirectoryName = imageDirectory,
             StylesheetPath = stylesheetPath,
+            StyleMap = styleMap,
         };
 
         return new ParseResult(CommandKind.Convert, input, options, null);
