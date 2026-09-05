@@ -3,7 +3,7 @@ namespace Docmd.Cli;
 using Docmd.Word;
 using Ooxml.Md.Core.Markdown;
 
-internal enum CommandKind { Convert, Audit, Register, License, Help, Version }
+internal enum CommandKind { Convert, Audit, Register, License, Help, Version, PrintStylesheet }
 
 internal sealed record ParseResult(
     CommandKind Command,
@@ -33,6 +33,11 @@ internal static class CommandLine
         {
             case "--version" or "-V":
                 return new ParseResult(CommandKind.Version, null, null, null);
+            case "--print-stylesheet":
+                // Emitting the stylesheet that actually ran is what makes --stylesheet a usable
+                // door rather than an advertised one: you start from the real thing, at the
+                // version you have, instead of reconstructing it from the repository.
+                return new ParseResult(CommandKind.PrintStylesheet, null, null, null);
             case "--help" or "-h":
                 return new ParseResult(CommandKind.Help, null, null, null);
             case "audit":
@@ -52,6 +57,7 @@ internal static class CommandLine
         var includeFrontmatter = true;
         var flavour = MarkdownFlavour.Gfm;
         var imageDirectory = "img";
+        string? stylesheetPath = null;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -116,6 +122,13 @@ internal static class CommandLine
 
                     assetBaseUrl = parsedAssetBaseUrl;
                     break;
+                case "--stylesheet":
+                    if (!TryTake(args, ref i, out stylesheetPath!))
+                    {
+                        return Fail($"{argument} requires a path.");
+                    }
+
+                    break;
                 case "--img-dir":
                     if (!TryTake(args, ref i, out imageDirectory!))
                     {
@@ -169,6 +182,7 @@ internal static class CommandLine
             IncludeFrontmatter = includeFrontmatter,
             Flavour = flavour,
             ImageDirectoryName = imageDirectory,
+            StylesheetPath = stylesheetPath,
         };
 
         return new ParseResult(CommandKind.Convert, input, options, null);

@@ -44,6 +44,23 @@ public sealed class CommandLineTests
     }
 
     [Fact]
+    public void Parse_ReadsTheStylesheetOverride()
+        => CommandLine.Parse(["report.docx", "--stylesheet", "mine.xslt"])
+            .Options!.StylesheetPath.Should().Be("mine.xslt");
+
+    [Fact]
+    public void Parse_RejectsAStylesheetFlagWithNoPath()
+        => CommandLine.Parse(["report.docx", "--stylesheet"]).Error.Should().Contain("--stylesheet");
+
+    [Fact]
+    public void Parse_RecognisesPrintStylesheet()
+        => CommandLine.Parse(["--print-stylesheet"]).Command.Should().Be(CommandKind.PrintStylesheet);
+
+    [Fact]
+    public void Parse_DefaultsToTheBuiltInStylesheet()
+        => CommandLine.Parse(["report.docx"]).Options!.StylesheetPath.Should().BeNull();
+
+    [Fact]
     public void Parse_RejectsAnUnknownFlag()
         => CommandLine.Parse(["report.docx", "--nope"]).Error.Should().Contain("--nope");
 
