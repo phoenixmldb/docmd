@@ -94,7 +94,10 @@ docmd <input.docx> [options]
   -h, --help                 -V, --version
 ```
 
-Images extract to `img/<document>/` so a batch run never collides. `--asset-base-url` writes them
+Images extract to `img/<document>/`, keyed on the document's filename — so two documents with
+the *same* name in different folders will overwrite each other's images, and their `.md` too.
+`scripts/convert-tree.sh` mirrors the source tree to avoid that, and counts how many a flat
+layout would have clobbered. `--asset-base-url` writes them
 locally but references them remotely, so whatever already moves your files — `aws s3 sync`, `azcopy`
 — keeps doing that job.
 
