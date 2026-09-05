@@ -1,5 +1,6 @@
 namespace Docmd.Word;
 
+using Ooxml.Md.Core.Assets;
 using Ooxml.Md.Core.Markdown;
 using Ooxml.Md.Core.StyleMapping;
 
@@ -41,4 +42,27 @@ public sealed record ConversionOptions
 
     /// <summary>House-style rules, or an empty map for built-in behaviour only.</summary>
     public StyleMap StyleMap { get; init; } = StyleMap.Empty;
+
+    /// <summary>
+    /// Where extracted assets are written, or null for
+    /// <see cref="Ooxml.Md.Core.Assets.FileSystemAssetSink"/> writing beside the Markdown.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The seam that separates where bytes land from what the Markdown says. A sink receives
+    /// each asset and returns the URI to reference it by, so an implementation can upload to
+    /// object storage, deduplicate on content hash, or refuse an asset outright, and the
+    /// Markdown follows whatever it returns.
+    /// </para>
+    /// <para>
+    /// Exposed here rather than only existing as an interface: <c>IAssetSink</c> documents
+    /// itself as the seam cloud sinks implement and ship as separate packages, and that was
+    /// not true while <see cref="DocumentConverter"/> constructed the filesystem sink
+    /// unconditionally. An extension point nothing can reach is a comment, not a seam.
+    /// </para>
+    /// <para>
+    /// Ignored when <see cref="IncludeImages"/> is false, since nothing is extracted at all.
+    /// </para>
+    /// </remarks>
+    public IAssetSink? AssetSink { get; init; }
 }
