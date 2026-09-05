@@ -23,13 +23,44 @@ using PhoenixmlDb.Xslt;
 /// </remarks>
 public static class MarkdownTransform
 {
-    /// <summary>Transforms an annotated composite into md-XML.</summary>
-    public static async Task<XDocument> RunAsync(XDocument composite, CancellationToken ct)
+    /// <summary>Transforms an annotated composite into md-XML using the built-in stylesheet.</summary>
+    public static Task<XDocument> RunAsync(XDocument composite, CancellationToken ct)
+        => RunAsync(composite, stylesheetPath: null, ct);
+
+    /// <summary>
+    /// Transforms an annotated composite into md-XML, optionally with a user stylesheet.
+    /// </summary>
+    /// <param name="composite">The annotated composite document to transform.</param>
+    /// <param name="stylesheetPath">
+    /// A stylesheet to run instead of the built-in one, or null for the built-in. Its own
+    /// directory becomes the base URI, so relative <c>xsl:import</c> and <c>xsl:include</c>
+    /// in a user stylesheet resolve against where that file lives rather than the process's
+    /// working directory.
+    /// </param>
+    /// <param name="ct">Cancels the transform.</param>
+    public static async Task<XDocument> RunAsync(XDocument composite, string? stylesheetPath, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(composite);
 
+        string stylesheet;
+        Uri? baseUri = null;
+        if (stylesheetPath is null)
+        {
+            stylesheet = StylesheetLoader.Read("markdown.xslt");
+        }
+        else
+        {
+            if (!File.Exists(stylesheetPath))
+            {
+                throw new FileNotFoundException($"Stylesheet not found: {stylesheetPath}", stylesheetPath);
+            }
+
+            stylesheet = await File.ReadAllTextAsync(stylesheetPath, ct).ConfigureAwait(false);
+            baseUri = new Uri(Path.GetFullPath(stylesheetPath));
+        }
+
         var transformer = new XsltTransformer();
-        await transformer.LoadStylesheetAsync(StylesheetLoader.Read("markdown.xslt")).ConfigureAwait(false);
+        await transformer.LoadStylesheetAsync(stylesheet, baseUri).ConfigureAwait(false);
 
         // DisableFormatting rather than the default indenting serialisation: re-indenting
         // on the way in adds whitespace text nodes the source never had. The stylesheet's

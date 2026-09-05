@@ -26,4 +26,15 @@ public sealed record ConversionOptions
     /// not threaded through here.
     /// </summary>
     public string ImageDirectoryName { get; init; } = "img";
+
+    /// <summary>
+    /// A user stylesheet to run instead of the built-in one, or null for the built-in.
+    /// </summary>
+    /// <remarks>
+    /// The transform is the product's semantic recovery layer, and it is a stylesheet rather
+    /// than compiled code precisely so it can be replaced. <c>--print-stylesheet</c> emits the
+    /// built-in one as a starting point, so overriding means editing what actually ran rather
+    /// than reconstructing it from the repository.
+    /// </remarks>
+    public string? StylesheetPath { get; init; }
 }

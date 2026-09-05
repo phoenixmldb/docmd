@@ -40,6 +40,9 @@ internal static class Program
             case CommandKind.Help:
                 await Console.Out.WriteLineAsync(UsageText).ConfigureAwait(false);
                 return ExitSuccess;
+            case CommandKind.PrintStylesheet:
+                await Console.Out.WriteLineAsync(StylesheetLoader.Read("markdown.xslt")).ConfigureAwait(false);
+                return ExitSuccess;
             case CommandKind.Version:
                 var version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";
                 await Console.Out.WriteLineAsync(version).ConfigureAwait(false);
@@ -138,10 +141,12 @@ internal static class Program
         Options:
           -o, --output <path>        output directory (default: .)
               --asset-base-url <url> emit remote URLs for local assets
+              --stylesheet <file>    run your own stylesheet instead of the built-in one
               --img-dir <name>       image folder name (default: img)
               --no-images            omit images entirely
               --flavour <name>       gfm | commonmark (default: gfm)
               --front-matter <mode>  yaml | none (default: yaml)
+              --print-stylesheet     write the built-in stylesheet to stdout and exit
           -h, --help                 show this help
           -V, --version              show the version
 

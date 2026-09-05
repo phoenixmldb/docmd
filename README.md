@@ -101,6 +101,29 @@ layout would have clobbered. `--asset-base-url` writes them
 locally but references them remotely, so whatever already moves your files — `aws s3 sync`, `azcopy`
 — keeps doing that job.
 
+## Making it produce what you want
+
+The transform is a stylesheet, not compiled code, and you can replace it. Start from the one
+that actually ran rather than reconstructing it:
+
+```console
+$ docmd --print-stylesheet > mine.xslt
+# edit mine.xslt — override the templates you care about, leave the rest
+$ docmd report.docx --stylesheet mine.xslt
+```
+
+`src/Docmd.Word/Stylesheets/markdown.xslt` is the whole semantic-recovery layer: which paragraph
+is a heading, which run is bold, how a Word list becomes a Markdown one. It is about 350 lines and
+it is meant to be read.
+
+The stylesheet's own directory is its base URI, so if you split your overrides across files, a
+relative `xsl:import` resolves against where those files live rather than against wherever you
+happened to run `docmd` from.
+
+We are not going to anticipate every house style. What we can do is meet the technical
+interpretation of what is in the document and hand you the transform, so refining it is a matter
+of editing XSLT rather than filing a feature request.
+
 ## What it does not do yet
 
 `--review`, `-r`/`--recursive`, `docmd audit`, `--style-map`, `--strict` and `--report` are on the

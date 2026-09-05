@@ -22,6 +22,17 @@ public sealed class ProgramTests : IDisposable
         (await RunAsync(missing, "-o", _workspace)).Should().Be(2);
     }
 
+    [Fact]
+    public async Task Run_PrintStylesheetSucceeds()
+        // Exit 0 matters: this is meant to be redirected into a file
+        // (docmd --print-stylesheet > mine.xslt), and a non-zero exit breaks that in a
+        // shell running with `set -e`.
+        => (await RunAsync("--print-stylesheet")).Should().Be(0);
+
+    [Fact]
+    public async Task Run_ReturnsUsageErrorForAStylesheetThatDoesNotExist()
+        => (await RunAsync("report.docx", "--stylesheet", "/does/not/exist.xslt")).Should().Be(2);
+
     [Theory]
     [InlineData("audit")]
     [InlineData("register")]

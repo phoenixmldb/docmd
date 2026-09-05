@@ -31,7 +31,7 @@ public static class DocumentConverter
 
         // 4: transform. The transform-and-parse join lives in one place (MarkdownTransform)
         // because it is itself a place data can be lost -- see that type's remarks.
-        var mdXml = await MarkdownTransform.RunAsync(composite, ct).ConfigureAwait(false);
+        var mdXml = await MarkdownTransform.RunAsync(composite, options.StylesheetPath, ct).ConfigureAwait(false);
 
         // 5a: assets first, so 5b can serialise the URIs the sink returned. Inverting this
         // would still write every asset to disk, but the Markdown string below would be
