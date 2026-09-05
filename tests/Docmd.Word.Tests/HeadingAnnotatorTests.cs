@@ -30,6 +30,49 @@ public sealed class HeadingAnnotatorTests
         => composite.Descendants(WordNames.W + "p").First();
 
     [Fact]
+    public void Annotate_DoesNotSpendASlugOnAParagraphInsideATableCell()
+    {
+        // A cell paragraph cannot become a heading: the table template extracts cell text with
+        // string-join and never applies templates, so the annotation is inert for output. It was
+        // not inert for the Slugger, which allocated "overview" to the cell and left the real
+        // heading below it as "overview-1" -- an anchor nobody can explain from reading the
+        // document. Plan 2's review-companion cross-links are built on these slugs.
+        var composite = Annotate("""
+            <w:tbl><w:tr><w:tc>
+              <w:p><w:pPr><w:outlineLvl w:val="0"/></w:pPr><w:r><w:t>Overview</w:t></w:r></w:p>
+            </w:tc></w:tr></w:tbl>
+            <w:p><w:pPr><w:outlineLvl w:val="0"/></w:pPr><w:r><w:t>Overview</w:t></w:r></w:p>
+            """);
+
+        var realHeading = composite.Descendants(WordNames.W + "p").Last();
+        realHeading.Attribute(WordNames.Docmd + "slug")!.Value.Should().Be("overview");
+    }
+
+    [Fact]
+    public void Annotate_TreatsAParagraphInsideATableCellAsNotAHeading()
+    {
+        var composite = Annotate("""
+            <w:tbl><w:tr><w:tc>
+              <w:p><w:pPr><w:outlineLvl w:val="0"/></w:pPr><w:r><w:t>Overview</w:t></w:r></w:p>
+            </w:tc></w:tr></w:tbl>
+            """);
+
+        var cellParagraph = composite.Descendants(WordNames.W + "p").Single();
+        cellParagraph.Attribute(WordNames.Docmd + "heading-source")!.Value.Should().Be("None");
+        cellParagraph.Attribute(WordNames.Docmd + "slug").Should().BeNull();
+        cellParagraph.Attribute(WordNames.Docmd + "outline-level").Should().BeNull();
+    }
+
+    [Fact]
+    public void Annotate_StillDeduplicatesRepeatedRealHeadings()
+        // The counter must keep working; the fix removes one input to it, not the mechanism.
+        => Annotate("""
+            <w:p><w:pPr><w:outlineLvl w:val="0"/></w:pPr><w:r><w:t>Scope</w:t></w:r></w:p>
+            <w:p><w:pPr><w:outlineLvl w:val="0"/></w:pPr><w:r><w:t>Scope</w:t></w:r></w:p>
+            """).Descendants(WordNames.W + "p").Last()
+            .Attribute(WordNames.Docmd + "slug")!.Value.Should().Be("scope-1");
+
+    [Fact]
     public void Annotate_UsesAnExplicitParagraphOutlineLevel()
     {
         var composite = Annotate("""
