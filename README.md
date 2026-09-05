@@ -189,7 +189,7 @@ That is the argument for dogfooding over conformance testing, in one bug.
 
 ```console
 $ dotnet build docmd.slnx
-$ dotnet test  docmd.slnx        # 270 tests, 0 skipped
+$ dotnet test  docmd.slnx        # 337 tests; 1 skipped is the opt-in corpus audit
 $ dotnet run --project src/Docmd.Cli -- sample.docx -o out/
 ```
 
@@ -203,9 +203,14 @@ are deliberately exceptions: a real `.docx` produced by a third-party writer, an
 carrying Word's own noise — `w:proofErr`, `rsid` attributes, bookmarks between runs, and words split
 mid-word at spell-check boundaries. Those two found bugs no hand-written fixture did.
 
-The Markdown serialiser is verified by a differential oracle: serialise, re-parse with an independent
-implementation, compare. That answers *does this Markdown mean what was intended*, which a golden
-file cannot.
+Two differential oracles do the correctness work a golden file cannot. The serialiser one
+round-trips through an independent Markdown implementation, answering *does this Markdown mean what
+was intended*. The end-to-end one checks that every word a reader sees in the `.docx` still appears,
+in order, in the output — it found two real defects on its first corpus run. Point it at your own
+documents with `DOCMD_CORPUS`.
+
+[CONTRIBUTING.md](CONTRIBUTING.md) covers the conventions and the four stylesheet traps that have
+each cost real time.
 
 ## Documentation
 
