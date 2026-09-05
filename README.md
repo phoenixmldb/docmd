@@ -213,7 +213,8 @@ file cannot.
   shaped the way it is
 - [Extending docmd](docs/extending.md) — style maps, custom stylesheets, and writing an
   `IAssetSink` to send images somewhere other than disk
-- [Limitations](docs/limitations.md) — what is knowingly dropped, measured rather than guessed
+- [Limitations](docs/limitations.md) — what is knowingly dropped and how large a document gets
+  before conversion slows down, both measured rather than guessed
 - [Deferred work](docs/deferred-work.md) — findings recorded instead of fixed, and why
 - [Engine defects](docs/engine-defects/) — bugs found in our own XSLT engine by building this on
   it, with reproductions

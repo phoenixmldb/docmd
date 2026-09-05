@@ -91,6 +91,52 @@ that also builds the corpus audit, so the choice can be made against measured fr
 - paragraphs emitting an empty `md:para` despite having non-empty `docmd:visible-text` — the
   stray-blank-line case above, which is a direct count of the inconsistency
 
+## Conversion cost climbs faster than document size above ~4,000 paragraphs
+
+**Status:** open, and accepted for now. **Measured:** 2026-09-05.
+
+Cost per paragraph is flat up to roughly 4,000 paragraphs and rises after it. Measured by
+growing a real 470-paragraph statement of work and converting each size:
+
+| Paragraphs | `document.xml` | Time | Peak RSS | Per paragraph |
+|---:|---:|---:|---:|---:|
+| 470 | 212 KB | 10 s | 121 MB | 21 ms |
+| 940 | 424 KB | 13 s | 142 MB | 14 ms |
+| 1,880 | 849 KB | 23 s | 163 MB | 12 ms |
+| 3,760 | 1.7 MB | 52 s | 213 MB | 14 ms |
+| 7,520 | 3.4 MB | 168 s | 343 MB | 22 ms |
+| 11,280 | 5.1 MB | 327 s | 453 MB | 29 ms |
+
+Between 3,760 and 11,280 paragraphs the curve is about **n^1.7**. Extrapolating, 20,000
+paragraphs is roughly fifteen minutes and 50,000 roughly an hour and a half — though that is an
+extrapolation, and the last one made from this data (a supposed memory wall) turned out to be
+wrong because the curve was not the shape it looked like from two points.
+
+**It degrades rather than failing.** No crash, no exhaustion, no wrong output: memory tops out
+at 453 MB for a 5 MB document and grows sublinearly, so the machine is never the constraint.
+The limit is patience, not capacity.
+
+**Where real documents sit.** A 1,000-paragraph design document converts in about 19 seconds,
+and a 32-document sample of ordinary business documents averaged about 6 seconds each. Nothing
+in normal office use approaches the knee. What does approach it is a single long technical
+manual — a 300-page S1000D or specification runs to 10,000 paragraphs or more.
+
+**Why it is accepted rather than fixed.** For a corpus converted once and then indexed, this is
+a one-time cost amortised over the life of the index, and the work being done is the product:
+heading detection through style inheritance, list reconstruction, style mapping. A pure text
+extractor is faster because it answers a smaller question.
+
+It stops being acceptable at volume in the large-document regime — one 300-page manual at
+fifteen minutes is fine, two hundred of them is not. Anyone in that regime should measure before
+committing to a batch window.
+
+**What would move it:** a residual superlinear term in the transform, not yet located. It is
+known *not* to be the `w:p` match patterns (neutering all three buys 15%), not
+`xsl:for-each-group`, not the style-map lookups, not template count, and not `xsl:strip-space` —
+each ruled out by measurement. A trivial stylesheet processes the same documents at a flat
+0.23 ms per paragraph, so the engine is capable of linear behaviour on this input.
+`TransformScalingTests` guards against the curve getting worse.
+
 ## Adjacent emphasis spans emit ambiguous delimiter runs
 
 **Status:** open. **Found:** the text-preservation oracle's first corpus run, 2026-09-05.
