@@ -1,0 +1,20 @@
+<Project>
+
+  <!--
+    Lock files are enabled here rather than in Directory.Build.props on purpose.
+
+    A PackageVersion pins a direct dependency but not its transitive graph, which otherwise
+    resolves to whatever NuGet offers on the day; the lock file pins the whole graph, so
+    "same commit, same bytes" holds for the build as well as for docmd's own output.
+
+    Setting RestorePackagesWithLockFile in Directory.Build.props fails restore on SDK
+    10.0.400 with NETSDK1013 ("The TargetFramework value '' was not recognized"), because
+    .props is imported before TargetFramework is established. Directory.Build.targets is
+    imported after, so the property lands where restore can already see the framework.
+    Verified: .props fails, .targets and a per-project PropertyGroup both succeed.
+  -->
+  <PropertyGroup>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+
+</Project>
