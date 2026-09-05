@@ -3,6 +3,7 @@ namespace Docmd.Word.Assembly;
 using System.Globalization;
 using System.Xml.Linq;
 using Ooxml.Md.Core.Opc;
+using Ooxml.Md.Core.StyleMapping;
 
 /// <summary>
 /// Pipeline stage 2: composes the WordprocessingML parts a transform needs into a single
@@ -16,9 +17,19 @@ using Ooxml.Md.Core.Opc;
 /// </remarks>
 public static class WordCompositeBuilder
 {
-    public static XDocument Build(OpcPackage package)
+    public static XDocument Build(OpcPackage package) => Build(package, StyleMap.Empty);
+
+    /// <summary>Composes the parts a transform needs, including a style map when one is given.</summary>
+    /// <param name="package">The opened .docx.</param>
+    /// <param name="styleMap">
+    /// House-style rules, carried in the composite rather than passed as an xsl:param: the engine
+    /// cannot hold a node in a parameter (docs/engine-defects/2026-09-04-xslt-node-valued-parameters.md),
+    /// and riding here keeps the transform a pure function of one input anyway.
+    /// </param>
+    public static XDocument Build(OpcPackage package, StyleMap styleMap)
     {
         ArgumentNullException.ThrowIfNull(package);
+        ArgumentNullException.ThrowIfNull(styleMap);
 
         var mainPartName = FindMainDocumentPart(package);
         var mainDocument = package.ReadXmlPart(mainPartName);
@@ -70,6 +81,7 @@ public static class WordCompositeBuilder
                 new XElement(WordNames.Docmd + "styles", styles is null ? null : new XElement(styles)),
                 new XElement(WordNames.Docmd + "numbering", numbering is null ? null : new XElement(numbering)),
                 new XElement(WordNames.Docmd + "relationships", relationships),
+                styleMap.ToXml(WordNames.Docmd),
                 properties));
     }
 

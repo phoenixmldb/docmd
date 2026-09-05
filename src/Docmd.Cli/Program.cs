@@ -98,6 +98,26 @@ internal static class Program
                 await Console.Error.WriteLineAsync($"! {issue.PartName}: {issue.Reason}").ConfigureAwait(false);
             }
 
+            foreach (var key in result.StyleUsage.EntriesThatMatchedNothing)
+            {
+                await Console.Error
+                    .WriteLineAsync($"! style map: '{key}' matched no style in this document.")
+                    .ConfigureAwait(false);
+            }
+
+            // Only for someone already writing a map. Unprompted, this is five lines of advice
+            // about a feature they did not ask for, on every conversion.
+            if (parsed.Options!.StyleMap.Rules.Count > 0)
+            {
+                foreach (var style in result.StyleUsage.MostUsedUnmappedStyles)
+                {
+                    await Console.Error
+                        .WriteLineAsync(
+                            $"? style map: '{style.Style}' is used {style.Count} time(s) and is not mapped.")
+                        .ConfigureAwait(false);
+                }
+            }
+
             return ExitSuccess;
         }
         catch (OpcFormatException ex)
@@ -142,6 +162,7 @@ internal static class Program
           -o, --output <path>        output directory (default: .)
               --asset-base-url <url> emit remote URLs for local assets
               --stylesheet <file>    run your own stylesheet instead of the built-in one
+              --style-map <file>     map house styles to Markdown constructs (YAML)
               --img-dir <name>       image folder name (default: img)
               --no-images            omit images entirely
               --flavour <name>       gfm | commonmark (default: gfm)

@@ -24,7 +24,7 @@ public static class DocumentConverter
 
         // 1 + 2: open and compose.
         using var package = OpcPackage.OpenFile(inputPath);
-        var composite = WordCompositeBuilder.Build(package);
+        var composite = WordCompositeBuilder.Build(package, options.StyleMap);
 
         // 3: annotate.
         HeadingAnnotator.Annotate(composite);
@@ -57,7 +57,9 @@ public static class DocumentConverter
             ? FrontmatterWriter.Write(properties) + body
             : body;
 
-        return new ConversionResult(markdown, properties, issues);
+        var styleUsage = StyleUsageReport.Build(composite, options.StyleMap);
+
+        return new ConversionResult(markdown, properties, issues, styleUsage);
     }
 
     public static async Task<ConversionResult> WriteAsync(

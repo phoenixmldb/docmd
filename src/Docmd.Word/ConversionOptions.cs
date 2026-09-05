@@ -1,6 +1,7 @@
 namespace Docmd.Word;
 
 using Ooxml.Md.Core.Markdown;
+using Ooxml.Md.Core.StyleMapping;
 
 /// <summary>Everything <see cref="DocumentConverter"/> needs to run one conversion.</summary>
 public sealed record ConversionOptions
@@ -37,4 +38,7 @@ public sealed record ConversionOptions
     /// than reconstructing it from the repository.
     /// </remarks>
     public string? StylesheetPath { get; init; }
+
+    /// <summary>House-style rules, or an empty map for built-in behaviour only.</summary>
+    public StyleMap StyleMap { get; init; } = StyleMap.Empty;
 }

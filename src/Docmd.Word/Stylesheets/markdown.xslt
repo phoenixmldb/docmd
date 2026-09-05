@@ -29,6 +29,30 @@
     </md:document>
   </xsl:template>
 
+  <!--
+    A style map entry for a paragraph or run style, matched on w:styleId first and then on the
+    style's localised w:name, so a map written against either works. The map rides in the
+    composite rather than arriving as an xsl:param: the engine cannot hold a node in a parameter
+    (docs/engine-defects/2026-09-04-xslt-node-valued-parameters.md), and riding here keeps the
+    transform a pure function of one input anyway.
+  -->
+  <xsl:function name="docmd:style-rule" as="element()?">
+    <xsl:param name="node" as="node()"/>
+    <xsl:param name="styleId" as="xs:string"/>
+    <xsl:variable name="map" select="root($node)/docmd:package/docmd:style-map"/>
+    <xsl:variable name="name"
+        select="string((root($node)/docmd:package/docmd:styles/w:styles
+                        /w:style[@w:styleId eq $styleId])[1]/w:name/@w:val)"/>
+    <xsl:sequence select="if ($styleId eq '') then ()
+                          else ($map/docmd:style[@key eq $styleId],
+                                $map/docmd:style[$name ne '' and @key eq $name])[1]"/>
+  </xsl:function>
+
+  <xsl:function name="docmd:para-rule" as="element()?">
+    <xsl:param name="p" as="element(w:p)"/>
+    <xsl:sequence select="docmd:style-rule($p, string($p/w:pPr/w:pStyle/@w:val))"/>
+  </xsl:function>
+
   <xsl:variable name="numbering" select="/docmd:package/docmd:numbering/w:numbering"/>
 
   <!--
@@ -82,7 +106,14 @@
   <xsl:function name="docmd:num-id" as="xs:string">
     <xsl:param name="p" as="element(w:p)"/>
     <xsl:variable name="id" select="string(($p/w:pPr/w:numPr/w:numId/@w:val, '')[1])"/>
-    <xsl:sequence select="if ($id eq '0') then '' else $id"/>
+    <xsl:variable name="rule" select="docmd:para-rule($p)"/>
+    <!--
+      A style mapped to a list kind joins the same grouping key numbering uses, so consecutive
+      mapped items form ONE list instead of a run of single-item lists with blank lines between.
+    -->
+    <xsl:sequence select="if ($rule/@as = ('list-item','ordered-list-item'))
+                          then concat('map:', $rule/@as)
+                          else if ($id eq '0') then '' else $id"/>
   </xsl:function>
 
   <xsl:function name="docmd:ilvl" as="xs:integer">
@@ -107,12 +138,20 @@
       contradicting the promise three lines above that one malformed document must never
       stop a corpus conversion.
     -->
+    <xsl:choose>
+      <xsl:when test="starts-with($numId, 'map:')">
+        <!-- A mapped list declares its own kind; numbering.xml has nothing to say about it. -->
+        <xsl:sequence select="$numId eq 'map:ordered-list-item'"/>
+      </xsl:when>
+      <xsl:otherwise>
     <xsl:variable name="abstractId"
         select="string(($numbering/w:num[@w:numId eq $numId]/w:abstractNumId/@w:val)[1])"/>
     <xsl:variable name="format"
         select="string(($numbering/w:abstractNum[@w:abstractNumId eq $abstractId]
                                   /w:lvl[xs:integer(@w:ilvl) eq $ilvl]/w:numFmt/@w:val)[1])"/>
     <xsl:sequence select="$format ne '' and $format ne 'bullet' and $format ne 'none'"/>
+      </xsl:otherwise>
+    </xsl:choose>
   </xsl:function>
 
   <!--
@@ -122,7 +161,7 @@
   -->
   <xsl:template match="w:body">
     <xsl:for-each-group select="*"
-        group-adjacent="if (self::w:p[w:pPr/w:numPr]) then docmd:num-id(.) else ''">
+        group-adjacent="if (self::w:p) then docmd:num-id(.) else ''">
       <xsl:choose>
         <xsl:when test="current-grouping-key() ne ''">
           <xsl:call-template name="build-list">
@@ -180,6 +219,46 @@
     the one outcome spec §14 forbids; falling through to the generic paragraph rule below
     loses the list marker and keeps the text, which is the right trade.
   -->
+
+  <!--
+    A mapped paragraph style, at priority 4 so an explicit instruction beats every inference
+    below it. List kinds are absent on purpose: those join the numbering grouping in
+    docmd:num-id, so build-list emits them and consecutive items form one list.
+
+    A prefix is LITERAL TEXT and is escaped like any other document text. Markdown in a prefix
+    would have to be injected raw, which is a good way to let one style map corrupt every
+    document it touches; anyone wanting emphasis there has the stylesheet override.
+  -->
+  <xsl:template match="w:p[docmd:para-rule(.)/@as = ('heading','blockquote','code-block','para')]"
+                priority="4">
+    <xsl:variable name="rule" select="docmd:para-rule(.)"/>
+    <xsl:variable name="prefix" select="string($rule/@prefix)"/>
+    <xsl:choose>
+      <xsl:when test="$rule/@as eq 'heading'">
+        <md:heading level="{if ($rule/@level ne '') then $rule/@level else '1'}"
+                    slug="{@docmd:slug}">
+          <md:text><xsl:value-of select="concat($prefix, docmd:visible-text(.))"/></md:text>
+        </md:heading>
+      </xsl:when>
+      <xsl:when test="$rule/@as eq 'code-block'">
+        <md:code-block><xsl:value-of select="concat($prefix, docmd:visible-text(.))"/></md:code-block>
+      </xsl:when>
+      <xsl:when test="$rule/@as eq 'blockquote'">
+        <md:blockquote>
+          <md:para>
+            <xsl:if test="$prefix ne ''"><md:text><xsl:value-of select="$prefix"/></md:text></xsl:if>
+            <xsl:apply-templates select="w:r | w:ins | w:hyperlink" mode="inline"/>
+          </md:para>
+        </md:blockquote>
+      </xsl:when>
+      <xsl:otherwise>
+        <md:para>
+          <xsl:if test="$prefix ne ''"><md:text><xsl:value-of select="$prefix"/></md:text></xsl:if>
+          <xsl:apply-templates select="w:r | w:ins | w:hyperlink" mode="inline"/>
+        </md:para>
+      </xsl:otherwise>
+    </xsl:choose>
+  </xsl:template>
 
   <!-- Headings. Level comes from annotation and is zero-based, so +1 for Markdown. -->
   <xsl:template match="w:p[@docmd:heading-source and @docmd:heading-source ne 'None']" priority="3">
@@ -324,20 +403,41 @@
         "turn bold OFF against a style that turns it on", which is what every run of body
         text inside a bold-styled block looks like.
       -->
-      <xsl:variable name="italicised" as="node()*">
-        <xsl:choose>
-          <xsl:when test="w:rPr/w:i[not(@w:val = ('0','false','off'))] and $text ne ''">
-            <md:em><xsl:sequence select="$innermost"/></md:em>
-          </xsl:when>
-          <xsl:otherwise><xsl:sequence select="$innermost"/></xsl:otherwise>
-        </xsl:choose>
-      </xsl:variable>
+      <xsl:variable name="charRule"
+          select="docmd:style-rule(., string(w:rPr/w:rStyle/@w:val))[@as = ('inline-code','strong','em')]"/>
 
       <xsl:choose>
-        <xsl:when test="w:rPr/w:b[not(@w:val = ('0','false','off'))] and $text ne ''">
-          <md:strong><xsl:sequence select="$italicised"/></md:strong>
+        <!--
+          A mapped character style REPLACES the toggle inference for that run rather than
+          layering over it. Explicit instruction beats inference, exactly as it does for a
+          mapped paragraph. The alternative means answering what a run that is both bold and
+          mapped to code should be, and there is no honest answer: a code span renders no markup
+          inside it, so either layering order misrepresents one of the two.
+        -->
+        <xsl:when test="exists($charRule) and $text ne ''">
+          <xsl:choose>
+            <xsl:when test="$charRule/@as eq 'inline-code'"><md:code><xsl:sequence select="$innermost"/></md:code></xsl:when>
+            <xsl:when test="$charRule/@as eq 'strong'"><md:strong><xsl:sequence select="$innermost"/></md:strong></xsl:when>
+            <xsl:otherwise><md:em><xsl:sequence select="$innermost"/></md:em></xsl:otherwise>
+          </xsl:choose>
         </xsl:when>
-        <xsl:otherwise><xsl:sequence select="$italicised"/></xsl:otherwise>
+        <xsl:otherwise>
+          <xsl:variable name="italicised" as="node()*">
+            <xsl:choose>
+              <xsl:when test="w:rPr/w:i[not(@w:val = ('0','false','off'))] and $text ne ''">
+                <md:em><xsl:sequence select="$innermost"/></md:em>
+              </xsl:when>
+              <xsl:otherwise><xsl:sequence select="$innermost"/></xsl:otherwise>
+            </xsl:choose>
+          </xsl:variable>
+
+          <xsl:choose>
+            <xsl:when test="w:rPr/w:b[not(@w:val = ('0','false','off'))] and $text ne ''">
+              <md:strong><xsl:sequence select="$italicised"/></md:strong>
+            </xsl:when>
+            <xsl:otherwise><xsl:sequence select="$italicised"/></xsl:otherwise>
+          </xsl:choose>
+        </xsl:otherwise>
       </xsl:choose>
     </xsl:if>
   </xsl:template>

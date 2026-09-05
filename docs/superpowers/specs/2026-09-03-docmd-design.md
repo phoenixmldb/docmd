@@ -242,14 +242,40 @@ If a document has comments or revisions and `--review` was not passed, docmd say
 A declarative map, passed as `--style-map <file>`, keyed by `w:styleId` or style name:
 
 ```yaml
-CautionNote:   { as: blockquote, prefix: "**Caution:** " }
+CautionNote:   { as: blockquote, prefix: "Caution: " }
 ProcedureStep: { as: ordered-list-item }
 PartNumber:    { as: inline-code }
 CorpTitle:     { as: heading, level: 1 }
 ```
 
-The map is handed to the stylesheet as an `xsl:param` document and consulted by key lookup, so
-supporting it costs very little. `as:` values correspond to md-XML element names.
+The map rides **inside the composite** as `docmd:style-map` and is consulted by key lookup.
+
+This section originally specified an `xsl:param`. The engine cannot carry a node in a parameter —
+`SetParameter` holds the raw CLR object, `$map instance of node()` is false, and any axis step
+against it is a dynamic error (`docs/engine-defects/2026-09-04-xslt-node-valued-parameters.md`).
+The composite is the better home regardless: the transform stays a pure function of one input, and
+the map appears in a dumped composite when something needs explaining. No revert is required when
+the engine gains parameter node support.
+
+`as:` values correspond to md-XML element names. Paragraph styles take `heading` (with `level`),
+`blockquote`, `list-item`, `ordered-list-item`, `code-block` and `para`; character styles take
+`inline-code`, `strong` and `em`.
+
+Two behaviours worth stating, because both are decisions rather than defaults:
+
+- **A mapped style beats inference.** The template sits at priority 4, above heading detection, so
+  `Heading1: { as: para }` demotes a heading deliberately. A mapped character style likewise
+  replaces the `w:b`/`w:i` reading for that run rather than layering over it — a run that is both
+  bold and mapped to code cannot be both, since a code span renders no markup inside it.
+- **A `prefix` is literal text** and is escaped like any other document text. Markdown in a prefix
+  would have to be injected raw, which is how one style map corrupts every document it touches;
+  `--stylesheet` is the door for anyone who wants that. It applies to `heading`, `blockquote`,
+  `code-block` and `para` — the kinds whose template emits it. On a list or character kind it is
+  a parse error rather than an accepted no-op, for the same reason `level` on a non-heading is:
+  an entry that does nothing is indistinguishable from one that was never read.
+
+Mapped list kinds join the numbering grouping key rather than emitting a list each, so consecutive
+mapped steps form one list instead of a run of single-item lists.
 
 `--stylesheet <file>` remains a documented escape hatch: user XSLT importing the default and
 overriding selected templates.
