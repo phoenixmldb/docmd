@@ -224,4 +224,23 @@ public sealed class MarkdownStylesheetTests
 
         markdown.Should().Be("The vent is compliant\n");
     }
+
+    [Fact]
+    public async Task Heading_KeepsWordsApartAcrossATab()
+    {
+        // Found by the text-preservation oracle on a real signature block: a heading built from
+        // docmd:visible-text dropped w:tab entirely and welded the words on either side. The
+        // inline path and the table-cell path had both already been fixed for exactly this;
+        // visible-text, which serves headings and code blocks, was missed.
+        var markdown = await ToMarkdownAsync(
+            """<w:p><w:pPr><w:outlineLvl w:val="0"/></w:pPr><w:r><w:t>Name</w:t><w:tab/><w:t>Value</w:t></w:r></w:p>""");
+
+        markdown.Should().Be("# Name Value\n");
+    }
+
+    [Fact]
+    public async Task Heading_KeepsWordsApartAcrossALineBreak()
+        => (await ToMarkdownAsync(
+                """<w:p><w:pPr><w:outlineLvl w:val="0"/></w:pPr><w:r><w:t>First</w:t><w:br/><w:t>Second</w:t></w:r></w:p>"""))
+            .Should().Be("# First Second\n");
 }

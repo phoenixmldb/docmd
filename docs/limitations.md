@@ -4,6 +4,11 @@ Behaviour docmd currently gets wrong, deliberately recorded rather than quietly 
 Each entry says what is lost, why it is not fixed yet, and what the corpus audit must count
 so the decision to leave it can be revisited with numbers instead of guesses.
 
+**Measured, not estimated.** `TextPreservationTests.Corpus_Audit` checks that every word a
+reader sees in a `.docx` still appears in the Markdown. On the 49-document sample it was built
+against, **36 convert without losing a single word**. The entries below are what accounts for
+the other 13.
+
 ## Text inside transparent wrappers is dropped
 
 **Status:** open. **Found:** whole-branch review of `feat/core-conversion`, 2026-09-04.
@@ -85,6 +90,58 @@ that also builds the corpus audit, so the choice can be made against measured fr
   is chosen from data
 - paragraphs emitting an empty `md:para` despite having non-empty `docmd:visible-text` — the
   stray-blank-line case above, which is a direct count of the inconsistency
+
+## Adjacent emphasis spans emit ambiguous delimiter runs
+
+**Status:** open. **Found:** the text-preservation oracle's first corpus run, 2026-09-05.
+
+A bold run immediately followed by an italic run produces `**bold***italic*`. CommonMark reads
+the three asterisks as a *single* delimiter run, so it does not close the bold and open the
+italic; the emphasised text is swallowed into markup and disappears from the rendered document.
+
+Real example, from a 2008 program guide: the source ends a bold sentence and then sets the full
+stop in italics, which Word does routinely.
+
+```
+source:  <w:r><w:b/><w:t>...monthly MCT Flash newsletter</w:t></w:r>
+         <w:r><w:i/><w:t>.</w:t></w:r>
+
+emitted: newsletter***.*
+
+read as: the full stop is gone
+```
+
+That single document lost 3,440 of 4,664 words to this one pattern, because bold-then-italic
+recurs throughout it. It is the largest single source of text loss measured so far.
+
+`MarkdigOracleTests` did not catch it: it round-trips emphasis spans one at a time, and the
+defect only exists *between* two adjacent spans.
+
+**Why it is not fixed here:** the repair is a real choice, not a patch. Switching `em` to `_`
+fixes adjacency but breaks intraword emphasis, which `_` cannot express. Separating the spans
+with an empty HTML comment works in CommonMark but puts markup in the output where the document
+had none. Emitting the second span's delimiter only when the preceding character is not an
+asterisk is the narrowest fix and needs its own oracle cases. Whichever is chosen, it changes
+the bytes of every document containing adjacent emphasis, so it wants doing deliberately.
+
+**What the audit must count:** runs whose emphasis differs from the immediately preceding run's
+with no separating text, by document.
+
+## Text inside a text box is dropped
+
+**Status:** open. **Found:** the text-preservation oracle's first corpus run, 2026-09-05.
+
+`w:txbxContent` holds paragraphs, but it sits inside `w:p/w:r/w:pict` (or `mc:AlternateContent`),
+so its paragraphs are not children of `w:body`. The `w:body` template groups over `*` — top-level
+children only — and the inline templates select `w:r | w:ins | w:hyperlink` from a paragraph, so
+nothing reaches into a text box. Every word inside one is lost.
+
+Measured on the 49-document sample: one document contained 236 `w:txbxContent` elements. Text
+boxes are how pull quotes, callouts and diagram labels are authored, so the loss is concentrated
+in exactly the summarising sentences a retrieval index would most want.
+
+**What the audit must count:** `w:txbxContent` occurrences per document, and characters of `w:t`
+inside them as a share of all `w:t` characters.
 
 ## A paragraph beginning with four or more tabs becomes a code block
 

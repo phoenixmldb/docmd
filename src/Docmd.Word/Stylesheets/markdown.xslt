@@ -476,9 +476,24 @@
     The text a reader would see. Selects w:t and never w:delText, so deleted words are
     absent by construction rather than by a filter someone can forget.
   -->
+  <!--
+    w:tab and w:br are word separators, not decoration, and they contribute one space each.
+    Selecting only w:t welded the words on either side of a tab: a heading reading
+    "Name<tab>Value" came out as "NameValue", and a real signature block reading
+    "SIGNATURE<tab><tab><tab>SIGNATURE" came out as one run of underscores. This is the same
+    defect already fixed twice, once for inline runs and once for table cells; this function
+    serves headings and code blocks and was missed both times. Found by the text preservation
+    oracle on its first corpus run.
+
+    Paragraphs that hold nothing but tabs are unaffected: the empty paragraph rule tests
+    normalize-space of this value, and a string of spaces still normalizes to nothing.
+  -->
   <xsl:function name="docmd:visible-text" as="xs:string">
     <xsl:param name="node" as="node()"/>
-    <xsl:sequence select="string-join($node//w:t[not(ancestor::w:del)], '')"/>
+    <xsl:sequence select="string-join(
+        for $n in $node//*[self::w:t or self::w:tab or self::w:br][not(ancestor::w:del)]
+        return if ($n/self::w:t) then string($n) else ' ',
+        '')"/>
   </xsl:function>
 
 </xsl:stylesheet>
