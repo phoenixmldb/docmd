@@ -207,6 +207,17 @@ The Markdown serialiser is verified by a differential oracle: serialise, re-pars
 implementation, compare. That answers *does this Markdown mean what was intended*, which a golden
 file cannot.
 
+## Documentation
+
+- [Architecture](docs/architecture.md) — how a `.docx` becomes Markdown, and why the pipeline is
+  shaped the way it is
+- [Extending docmd](docs/extending.md) — style maps, custom stylesheets, and writing an
+  `IAssetSink` to send images somewhere other than disk
+- [Limitations](docs/limitations.md) — what is knowingly dropped, measured rather than guessed
+- [Deferred work](docs/deferred-work.md) — findings recorded instead of fixed, and why
+- [Engine defects](docs/engine-defects/) — bugs found in our own XSLT engine by building this on
+  it, with reproductions
+
 ## Licence
 
 Apache-2.0. See [LICENSE](LICENSE).

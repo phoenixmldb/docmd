@@ -39,7 +39,8 @@ public static class DocumentConverter
         IReadOnlyList<AssetIssue> issues = [];
         if (options.IncludeImages)
         {
-            var sink = new FileSystemAssetSink(options.OutputDirectory, options.AssetBaseUrl);
+            var sink = options.AssetSink
+                      ?? new FileSystemAssetSink(options.OutputDirectory, options.AssetBaseUrl);
             issues = await AssetRewriter.RewriteAsync(mdXml, package, sink, stem, ct).ConfigureAwait(false);
         }
         else

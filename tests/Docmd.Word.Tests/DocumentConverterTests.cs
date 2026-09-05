@@ -3,6 +3,7 @@ namespace Docmd.Word.Tests;
 using System.Threading.Tasks;
 using Docmd.Word;
 using FluentAssertions;
+using Ooxml.Md.Core.Assets;
 using Ooxml.Md.Core.Opc;
 using Xunit;
 
@@ -104,4 +105,38 @@ public sealed class DocumentConverterTests : IDisposable
     }
 
     public void Dispose() => Directory.Delete(_workspace, recursive: true);
+
+    /// <summary>Records what it was handed and rewrites the URI, like a cloud sink would.</summary>
+    private sealed class RecordingSink : IAssetSink
+    {
+        public List<(string Path, string ContentType, long Bytes)> Written { get; } = [];
+
+        public async Task<Uri> WriteAsync(
+            string relativePath, Stream content, string contentType, CancellationToken ct)
+        {
+            using var buffer = new MemoryStream();
+            await content.CopyToAsync(buffer, ct);
+            Written.Add((relativePath, contentType, buffer.Length));
+            return new Uri($"https://assets.example.com/{relativePath}", UriKind.Absolute);
+        }
+    }
+
+    [Fact]
+    public async Task Convert_UsesASuppliedAssetSinkAndTheUriItReturns()
+    {
+        // The seam is only a seam if a caller can reach it. IAssetSink documents itself as what
+        // cloud sinks implement and ship separately, which was not true while the converter
+        // constructed the filesystem sink unconditionally.
+        var sink = new RecordingSink();
+        var result = await DocumentConverter.ConvertAsync(
+            StageDocx("with-image", "with-image.docx"),
+            Options with { AssetSink = sink },
+            TestContext.Current.CancellationToken);
+
+        sink.Written.Should().NotBeEmpty("the sink should receive the document's images");
+        sink.Written.Should().AllSatisfy(a => a.Bytes.Should().BeGreaterThan(0));
+        result.Markdown.Should().Contain(
+            "https://assets.example.com/",
+            "the Markdown references whatever URI the sink returned, not a local path");
+    }
 }
