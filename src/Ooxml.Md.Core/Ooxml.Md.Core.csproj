@@ -1,5 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <PackageReference Include="YamlDotNet" />
+    <!--
+      Markdig reads docmd's own finished Markdown back so the converter can report whether any
+      of the document's words failed to survive. It has to be an implementation we did not
+      write: our escaping cannot be the judge of whether our escaping is correct. It was
+      test-only until text coverage became a shipped guarantee rather than a test assertion.
+    -->
+    <PackageReference Include="Markdig" />
   </ItemGroup>
 </Project>

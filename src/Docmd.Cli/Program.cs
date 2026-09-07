@@ -2,6 +2,7 @@ namespace Docmd.Cli;
 
 using System.Diagnostics;
 using Docmd.Word;
+using Docmd.Word.Assembly;
 using Ooxml.Md.Core.Opc;
 
 internal static class Program
@@ -96,6 +97,13 @@ internal static class Program
             foreach (var issue in result.AssetIssues)
             {
                 await Console.Error.WriteLineAsync($"! {issue.PartName}: {issue.Reason}").ConfigureAwait(false);
+            }
+
+            // Before the style-map advice: a document that lost words is a bigger problem than
+            // a map entry that matched nothing, and stderr is read top down.
+            foreach (var line in TextCoverageReport.Describe(result.Coverage))
+            {
+                await Console.Error.WriteLineAsync(line).ConfigureAwait(false);
             }
 
             foreach (var key in result.StyleUsage.EntriesThatMatchedNothing)

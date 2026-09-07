@@ -4,10 +4,24 @@ Behaviour docmd currently gets wrong, deliberately recorded rather than quietly 
 Each entry says what is lost, why it is not fixed yet, and what the corpus audit must count
 so the decision to leave it can be revisited with numbers instead of guesses.
 
-**Measured, not estimated.** `TextPreservationTests.Corpus_Audit` checks that every word a
-reader sees in a `.docx` still appears in the Markdown. On the 49-document sample it was built
-against, **38 convert without losing a single word**. The entries below are what accounts for
-the other 11.
+**Measured, not estimated.** docmd checks every conversion: it compares the words a reader can
+see in the `.docx` against the words a Markdown parser recovers from the output, and reports any
+that did not survive. On the 49-document sample it was built against:
+
+| | |
+|---|---|
+| Documents converted | 49 of 49, none failed |
+| Documents losing not one word | **27** |
+| Words lost, all documents | **529** — about 0.4% of the corpus |
+| Worst document | a 184-word invoice losing 68 |
+
+The entries below are what accounts for the rest.
+
+An earlier revision of this file reported 3.15% loss and a document losing 92.5% of itself. Those
+figures were wrong. They came from a sequence-alignment check that mis-paired a repeated common
+word, advanced past everything between, and reported the remainder as missing; on one document it
+turned a real loss of 8 words into a claim of 3,307. The measurement now counts occurrences
+instead, which cannot cascade.
 
 ## Text inside transparent wrappers is dropped
 
@@ -161,7 +175,7 @@ guard that already existed for whitespace-only spans. The text is preserved exac
 that Markdown cannot express reliably is dropped, and an italic full stop is not worth corrupting
 a sentence to attempt.
 
-Corpus effect: 36 of 49 documents lost no text before, 38 after.
+Corpus effect at the time: it removed the single largest source of loss in the sample.
 
 ## Text inside a text box is dropped
 
@@ -174,7 +188,9 @@ nothing reaches into a text box. Every word inside one is lost.
 
 Measured on the 49-document sample: one document contained 236 `w:txbxContent` elements. Text
 boxes are how pull quotes, callouts and diagram labels are authored, so the loss is concentrated
-in exactly the summarising sentences a retrieval index would most want.
+in exactly the summarising sentences a retrieval index would most want. docmd now counts them and
+says so when a document loses words, rather than leaving the reader to wonder where the text
+went.
 
 **What the audit must count:** `w:txbxContent` occurrences per document, and characters of `w:t`
 inside them as a share of all `w:t` characters.
