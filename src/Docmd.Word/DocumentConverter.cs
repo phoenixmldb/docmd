@@ -60,7 +60,12 @@ public static class DocumentConverter
 
         var styleUsage = StyleUsageReport.Build(composite, options.StyleMap);
 
-        return new ConversionResult(markdown, properties, issues, styleUsage);
+        // Measured against the body only, so frontmatter cannot mask a loss by supplying words
+        // the document did not lose. Always computed rather than opt-in: a caller who has to
+        // remember to ask whether their document survived will not ask on the run that mattered.
+        var coverage = TextCoverageReport.Measure(composite, body);
+
+        return new ConversionResult(markdown, properties, issues, styleUsage, coverage);
     }
 
     public static async Task<ConversionResult> WriteAsync(

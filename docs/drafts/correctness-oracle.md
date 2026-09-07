@@ -11,8 +11,8 @@ status: DRAFT. Destined for phoenixml.dev/guides and a LinkedIn edit. Held in th
 We built a tool that converts Word documents to Markdown. It had 232 tests, a clean build with
 analyzers set to fail on any diagnostic, and it converted a 49-document corpus without crashing.
 
-It was also silently losing 3,440 words out of 4,664 in one of those documents, and nothing in
-the test suite could tell.
+It was also silently destroying sentences in some of those documents, and nothing in the test
+suite could tell.
 
 ## The gap that tests do not cover
 
@@ -128,14 +128,20 @@ the wrong fix visible before it shipped.
 
 On a 49-document corpus of real business documents spanning 2008 to 2024:
 
-**38 convert without losing a single word. Eleven do not.**
+**27 convert without losing a single word. Total loss across all 49 is 529 words,
+about 0.4% of the corpus.**
 
-We publish the eleven. The remaining losses are text inside text boxes, inside inline content
+We publish the rest. The remaining losses are text inside text boxes, inside inline content
 controls, and inside fields — each documented, each with a note on what an audit must count so
 the decision to leave it can be revisited with numbers rather than opinions.
 
-Thirty-eight out of forty-nine is a worse-sounding number than "all tests pass," and it is a far
-more useful one. It is the difference between a claim and a measurement.
+And the check now ships. Every conversion is measured, and docmd tells you when a document lost
+words and what construct it could not read. A converted document goes into a retrieval index or
+a contract review; a sentence that quietly lost its subject is worse than a document that failed
+loudly, because nothing downstream can tell.
+
+That number is a worse-sounding one than "all tests pass," and it is far more useful. It is the
+difference between a claim and a measurement.
 
 ## What transfers
 
