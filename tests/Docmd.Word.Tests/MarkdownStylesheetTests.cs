@@ -243,4 +243,50 @@ public sealed class MarkdownStylesheetTests
         => (await ToMarkdownAsync(
                 """<w:p><w:pPr><w:outlineLvl w:val="0"/></w:pPr><w:r><w:t>First</w:t><w:br/><w:t>Second</w:t></w:r></w:p>"""))
             .Should().Be("# First Second\n");
+
+    [Fact]
+    public async Task TextBoxContent_BecomesBlocksAfterItsAnchorParagraph()
+    {
+        // A text box holds paragraphs, not runs, so its words cannot be emitted inline where the
+        // box is anchored. Before this they were not emitted at all: an invoice lost its entire
+        // certification statement, and a callout is exactly the summarising sentence a retrieval
+        // index most wants.
+        var markdown = await ToMarkdownAsync("""
+            <w:p><w:r><w:t>Before</w:t></w:r></w:p>
+            <w:p><w:r><w:pict><v:shape xmlns:v="urn:schemas-microsoft-com:vml"><v:textbox><w:txbxContent>
+              <w:p><w:r><w:t>Boxed callout</w:t></w:r></w:p>
+            </w:txbxContent></v:textbox></v:shape></w:pict></w:r></w:p>
+            <w:p><w:r><w:t>After</w:t></w:r></w:p>
+            """);
+
+        markdown.Should().Be("Before\n\nBoxed callout\n\nAfter\n");
+    }
+
+    [Fact]
+    public async Task AParagraphHoldingOnlyATextBox_DoesNotAlsoEmitABlankParagraph()
+        // The anchor paragraph has no words of its own. Counting the box's words as the
+        // paragraph's made it look non-empty, so it emitted an empty para beside the content.
+        => (await ToMarkdownAsync("""
+            <w:p><w:r><w:pict><v:shape xmlns:v="urn:schemas-microsoft-com:vml"><v:textbox><w:txbxContent>
+              <w:p><w:r><w:t>Only this</w:t></w:r></w:p>
+            </w:txbxContent></v:textbox></v:shape></w:pict></w:r></w:p>
+            """))
+            .Should().Be("Only this\n");
+
+    [Fact]
+    public async Task ATextBoxInsideATableCell_IsNotCountedTwice()
+    {
+        // The cell extractor walked every descendant w:p and then every descendant w:t of each,
+        // so a paragraph containing a text box contributed the box's words and the box's own
+        // paragraph contributed them again. A real invoice printed its certification twice.
+        var markdown = await ToMarkdownAsync("""
+            <w:tbl><w:tr><w:tc>
+              <w:p><w:r><w:pict><v:shape xmlns:v="urn:schemas-microsoft-com:vml"><v:textbox><w:txbxContent>
+                <w:p><w:r><w:t>certified</w:t></w:r></w:p>
+              </w:txbxContent></v:textbox></v:shape></w:pict></w:r></w:p>
+            </w:tc></w:tr></w:tbl>
+            """);
+
+        markdown.Split("certified").Length.Should().Be(2, "the word should appear exactly once");
+    }
 }

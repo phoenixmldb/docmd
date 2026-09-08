@@ -61,6 +61,19 @@ public static class TextCoverageReport
     private static readonly XNamespace Word = W;
 
     /// <summary>
+    /// The legacy half of an <c>mc:AlternateContent</c>, which repeats verbatim what the
+    /// <c>mc:Choice</c> beside it already says.
+    /// </summary>
+    /// <remarks>
+    /// A reader sees one of the two, never both: Word renders the choice it understands and
+    /// ignores the fallback. Counting both made this check demand two copies of every word in
+    /// a document that used them, and report the second copy as lost. One real deck carried 118
+    /// of these and was scored as losing 120 words it had not lost.
+    /// </remarks>
+    private static readonly XNamespace Compatibility =
+        "http://schemas.openxmlformats.org/markup-compatibility/2006";
+
+    /// <summary>
     /// Wrappers docmd's transform does not descend into. Their text is in the document and not
     /// in the output, so counting them turns "words are missing" into "here is why".
     /// </summary>
@@ -122,7 +135,9 @@ public static class TextCoverageReport
             {
                 text.Append(' ');
             }
-            else if (node.Name == Word + "t" && !node.Ancestors(Word + "del").Any())
+            else if (node.Name == Word + "t"
+                     && !node.Ancestors(Word + "del").Any()
+                     && !node.Ancestors(Compatibility + "Fallback").Any())
             {
                 text.Append(node.Value);
             }

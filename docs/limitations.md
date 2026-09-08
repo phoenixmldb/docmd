@@ -11,9 +11,9 @@ that did not survive. On the 49-document sample it was built against:
 | | |
 |---|---|
 | Documents converted | 49 of 49, none failed |
-| Documents losing not one word | **27** |
-| Words lost, all documents | **529** — about 0.4% of the corpus |
-| Worst document | a 184-word invoice losing 68 |
+| Documents losing not one word | **40** |
+| Words lost, all documents | **207** — about 0.15% of the corpus |
+| Worst document | a 184-word invoice losing 72 |
 
 The entries below are what accounts for the rest.
 

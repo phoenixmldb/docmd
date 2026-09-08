@@ -12,12 +12,13 @@
     xmlns:xs="http://www.w3.org/2001/XMLSchema"
     xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
     xmlns:docmd="https://phoenixml.dev/docmd"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:md="https://phoenixml.dev/docmd/md"
     xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
     xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
     xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"
     xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-    exclude-result-prefixes="xs w docmd wp a pic r">
+    exclude-result-prefixes="xs w mc docmd wp a pic r">
 
   <xsl:output method="xml" indent="no"/>
   <xsl:strip-space elements="*"/>
@@ -205,7 +206,7 @@
       <xsl:for-each-group select="$items" group-starting-with="w:p[docmd:ilvl(.) le $level]">
         <md:item>
           <md:para>
-            <xsl:apply-templates select="current-group()[1]/(w:r | w:ins | w:hyperlink)" mode="inline"/>
+            <xsl:apply-templates select="current-group()[1]/(w:r | w:ins | w:hyperlink | w:sdt | w:fldSimple | w:smartTag)" mode="inline"/>
           </md:para>
           <xsl:variable name="deeper" select="current-group()[position() gt 1]"/>
           <xsl:if test="exists($deeper)">
@@ -268,14 +269,14 @@
         <md:blockquote>
           <md:para>
             <xsl:if test="$prefix ne ''"><md:text><xsl:value-of select="$prefix"/></md:text></xsl:if>
-            <xsl:apply-templates select="w:r | w:ins | w:hyperlink" mode="inline"/>
+            <xsl:apply-templates select="w:r | w:ins | w:hyperlink | w:sdt | w:fldSimple | w:smartTag" mode="inline"/>
           </md:para>
         </md:blockquote>
       </xsl:when>
       <xsl:otherwise>
         <md:para>
           <xsl:if test="$prefix ne ''"><md:text><xsl:value-of select="$prefix"/></md:text></xsl:if>
-          <xsl:apply-templates select="w:r | w:ins | w:hyperlink" mode="inline"/>
+          <xsl:apply-templates select="w:r | w:ins | w:hyperlink | w:sdt | w:fldSimple | w:smartTag" mode="inline"/>
         </md:para>
       </xsl:otherwise>
     </xsl:choose>
@@ -298,13 +299,28 @@
     a factor of 169. Joining them with "and" is semantically identical here because neither
     predicate is positional. Engine defect: docs/engine-defects/2026-09-05-xslt-chained-predicates-in-match-patterns.md
   -->
-  <xsl:template match="w:p[not(normalize-space(docmd:visible-text(.))) and not(.//w:drawing)]"
+  <xsl:template match="w:p[not(normalize-space(docmd:own-text(.)))
+                          and not(.//w:drawing) and not(.//w:txbxContent)]"
                 priority="1"/>
 
+  <!--
+    A text box holds paragraphs, not runs, so its content cannot be emitted inline where the
+    box is anchored. It becomes sibling blocks immediately after the anchoring paragraph, which
+    is the closest honest reading of a floating box in a linear document: its words survive, in
+    roughly the place a reader met them.
+
+    Only outermost boxes are selected. A box nested inside another would otherwise be emitted
+    twice, once by this paragraph and once by the box paragraph that also contains it, and
+    duplicating content is a worse failure than the vanishingly rare nested box it protects.
+  -->
   <xsl:template match="w:p" priority="0">
-    <md:para>
-      <xsl:apply-templates select="w:r | w:ins | w:hyperlink" mode="inline"/>
-    </md:para>
+    <xsl:if test="normalize-space(docmd:own-text(.)) ne '' or .//w:drawing">
+      <md:para>
+        <xsl:apply-templates select="w:r | w:ins | w:hyperlink | w:sdt | w:fldSimple | w:smartTag" mode="inline"/>
+      </md:para>
+    </xsl:if>
+    <xsl:apply-templates
+        select=".//w:txbxContent[not(ancestor::w:txbxContent)][not(ancestor::mc:Fallback)]/w:p"/>
   </xsl:template>
 
   <xsl:template match="w:tbl">
@@ -342,7 +358,7 @@
                 <md:text>
                   <xsl:value-of select="normalize-space(
                       string-join(
-                          for $p in .//w:p
+                          for $p in .//w:p[not(ancestor::w:txbxContent)]
                           return string-join(
                               for $n in $p//*[self::w:t or self::w:br or self::w:tab]
                                              [not(ancestor::w:del)]
@@ -389,6 +405,34 @@
 
   <!-- Insertions are part of the accepted text; deletions are not reached at all,
        because no template selects w:del. -->
+  <!--
+    Wrappers a reader never sees, holding text a reader does see.
+
+    A content control carries the variable parts of a templated document, which is to say the
+    customer name, the revision and the approval block: precisely the fields most worth
+    indexing. A field carries a cached result, and measured across the corpus this was built
+    against those results are 103 DOCPROPERTY, 12 SEQ, a TITLE and an AUTHOR, with no PAGE and
+    no TOC. Every one of them is content. A smart tag is a recognition marker around ordinary
+    words.
+
+    The elements deliberately still left out are the ones whose text a reader is NOT shown:
+    w:instrText holds a field code rather than its result, and w:del holds text the author
+    removed under track changes. Emitting those would put "PAGE \* MERGEFORMAT" and a deleted
+    price into a document someone indexes, which is a worse failure than omission because it
+    invents content instead of missing it.
+
+    This remains a whitelist and will therefore always be incomplete, because OOXML keeps
+    growing. The text-coverage check is what makes that survivable: a document whose words go
+    missing now says so rather than converting quietly.
+  -->
+  <xsl:template match="w:sdt" mode="inline">
+    <xsl:apply-templates select="w:sdtContent/(w:r | w:ins | w:hyperlink | w:sdt | w:fldSimple | w:smartTag)" mode="inline"/>
+  </xsl:template>
+
+  <xsl:template match="w:fldSimple | w:smartTag" mode="inline">
+    <xsl:apply-templates select="w:r | w:ins | w:hyperlink | w:sdt | w:fldSimple | w:smartTag" mode="inline"/>
+  </xsl:template>
+
   <xsl:template match="w:ins" mode="inline">
     <xsl:apply-templates select="w:r" mode="inline"/>
   </xsl:template>
@@ -488,6 +532,25 @@
     Paragraphs that hold nothing but tabs are unaffected: the empty paragraph rule tests
     normalize-space of this value, and a string of spaces still normalizes to nothing.
   -->
+  <!--
+    A paragraph's own text, excluding any text box anchored INSIDE it.
+
+    The exclusion is relative, which matters more than it reads. Excluding every w:t that has a
+    text box ancestor anywhere also excludes the box's own paragraphs when they are the ones
+    being asked about, so each looked empty, was suppressed as blank, and the callout vanished
+    exactly as before. The intersect tests that the box sits within this node rather than
+    around it.
+  -->
+  <xsl:function name="docmd:own-text" as="xs:string">
+    <xsl:param name="node" as="node()"/>
+    <xsl:sequence select="string-join(
+        for $n in $node//*[self::w:t or self::w:tab or self::w:br]
+                          [not(ancestor::w:del)
+                           and empty(ancestor::w:txbxContent intersect $node//w:txbxContent)]
+        return if ($n/self::w:t) then string($n) else ' ',
+        '')"/>
+  </xsl:function>
+
   <xsl:function name="docmd:visible-text" as="xs:string">
     <xsl:param name="node" as="node()"/>
     <xsl:sequence select="string-join(
