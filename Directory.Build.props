@@ -11,6 +11,14 @@
     <AnalysisLevel>latest-all</AnalysisLevel>
   </PropertyGroup>
   <PropertyGroup>
+    <!--
+      One version for the whole product. 0.x is deliberate: docmd converts real documents well
+      (43 of 49 in the reference corpus lose not one word) but several advertised flags are not
+      implemented yet, and 1.0 is a promise about stability that should be made once rather than
+      taken back. It also leaves room to change the md-XML vocabulary, which a custom stylesheet
+      depends on.
+    -->
+    <Version>0.1.0</Version>
     <Authors>Endpoint Systems</Authors>
     <Company>Endpoint Systems</Company>
     <Product>docmd</Product>

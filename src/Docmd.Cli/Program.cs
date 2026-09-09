@@ -1,5 +1,7 @@
 namespace Docmd.Cli;
 
+using System.Reflection;
+
 using System.Diagnostics;
 using Docmd.Word;
 using Docmd.Word.Assembly;
@@ -45,7 +47,17 @@ internal static class Program
                 await Console.Out.WriteLineAsync(StylesheetLoader.Read("markdown.xslt")).ConfigureAwait(false);
                 return ExitSuccess;
             case CommandKind.Version:
-                var version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";
+                // The informational version, not the assembly version. AssemblyVersion is
+                // always four-part and drops any prerelease suffix, so a build of 0.2.0-beta.1
+                // reported itself as 0.2.0.0 -- the one number a bug report must get right.
+                var version = typeof(Program).Assembly
+                    .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()
+                    ?.InformationalVersion
+                    ?? typeof(Program).Assembly.GetName().Version?.ToString()
+                    ?? "0.0.0";
+
+                // Source-link builds append "+<commit sha>"; useful in a package, noise here.
+                version = version.Split('+')[0];
                 await Console.Out.WriteLineAsync(version).ConfigureAwait(false);
                 return ExitSuccess;
             case CommandKind.Audit or CommandKind.Register or CommandKind.License:

@@ -125,6 +125,31 @@ person from repeating the search.
   a document corpus is a property worth protecting; changing it is sometimes right, but never
   accidental.
 
+## Releasing
+
+The version lives once, in `Directory.Build.props`. `dotnet pack src/Docmd.Cli` produces the
+tool package; nothing else in the repository is published.
+
+```console
+$ dotnet pack src/Docmd.Cli -c Release -o out
+$ dotnet tool install --tool-path ./verify --add-source ./out Docmd.Cli --version <v>
+$ ./verify/docmd --version && ./verify/docmd sample.docx -o /tmp/check
+```
+
+Install from the package before pushing it. Building a library proves less than it looks: the
+stylesheet is an embedded resource, so a packaging mistake shows up when the tool runs and
+nowhere earlier.
+
+Then tag (`v<version>`), and update `CHANGELOG.md` — moving the entry out of `Unreleased` and
+dating it — before the tag rather than after, so the tag points at the changelog it describes.
+
+**Pushing to nuget.org publishes the tool to everyone.** It is public whatever the repository's
+visibility, so it is the moment docmd becomes public, not a step after that decision. Treat it
+accordingly.
+
+While docmd is `0.x`, a minor bump may change conversion output. The md-XML vocabulary a custom
+stylesheet writes against is not stable until `1.0`.
+
 ## Licence
 
 Apache-2.0. Contributions are accepted under the same licence.
