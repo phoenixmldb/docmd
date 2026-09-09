@@ -83,7 +83,7 @@ was costing 84% of every conversion:
 
 | | before | after |
 |---|---|---|
-| `BAE WebReq Design v2-2.docx` (1,000 paragraphs) | 124 s | **19 s** |
+| A 1,000-paragraph design document | 124 s | **19 s** |
 | 32-document corpus, end to end | over 600 s (timed out) | **182 s** |
 
 Output is byte-identical across all 32 documents. The workaround is in place
