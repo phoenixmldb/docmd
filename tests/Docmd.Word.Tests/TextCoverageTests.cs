@@ -111,14 +111,27 @@ public sealed class TextCoverageTests : IDisposable
     }
 
     [Fact]
-    public void Measure_NamesWhatDocmdCannotRead()
-        // "Words are missing" is not actionable; "this document has 3 text boxes" is.
-        => TextCoverageReport.Measure(
-                Source("""
-                    <w:p><w:r><w:pict><w:txbxContent><w:p><w:r><w:t>boxed</w:t></w:r></w:p></w:txbxContent></w:pict></w:r></w:p>
-                    """),
-                "\n")
-            .Causes.Should().ContainSingle().Which.Construct.Should().Be("text box");
+    public void Measure_NamesTheStructureTheLostWordsAreIn()
+    {
+        // "Words are missing" is not actionable; "they are inside <txbxContent>" is. Read from
+        // the document rather than a fixed list of constructs we know we skip, because that list
+        // went stale the moment the transform learned to read text boxes and began reporting
+        // "which docmd does not read" about text boxes it had read correctly.
+        var coverage = TextCoverageReport.Measure(
+            Source("""
+                <w:p><w:r><w:pict><w:txbxContent><w:p><w:r><w:t>boxed</w:t></w:r></w:p></w:txbxContent></w:pict></w:r></w:p>
+                """),
+            "\n");
+
+        coverage.Causes.Select(c => c.Construct).Should().Contain(["txbxContent", "pict"]);
+    }
+
+    [Fact]
+    public void Measure_DoesNotBlameTheCompositesOwnWrappers()
+        // docmd:package and docmd:body are ancestors of every node in the composite, so naming
+        // them would attach a meaningless cause to every loss ever reported.
+        => TextCoverageReport.Measure(Source(Para("alpha beta")), "alpha\n")
+            .Causes.Select(c => c.Construct).Should().NotContain(["package", "body"]);
 
     [Fact]
     public void Describe_SaysNothingWhenTheDocumentSurvivedIntact()

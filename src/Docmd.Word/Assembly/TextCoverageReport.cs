@@ -11,16 +11,16 @@ using Ooxml.Md.Core.Markdown;
 public sealed record LostWord(string Word, string Context);
 
 /// <summary>A construct that explains missing text, and how much of it this document has.</summary>
-/// <param name="Construct">What it is, in words a person can act on.</param>
-/// <param name="Count">How many occurrences the document contains.</param>
+/// <param name="Construct">The element name, as it appears in the document.</param>
+/// <param name="Count">How many of the lost words sit inside one.</param>
 public sealed record LossCause(string Construct, int Count);
 
 /// <summary>How much of a document's text survived conversion.</summary>
 /// <param name="SourceWords">Words a reader can see in the source document.</param>
 /// <param name="LostWords">Those the Markdown does not contain, in document order.</param>
 /// <param name="Causes">
-/// Constructs present in the source whose text docmd is known not to reach. Reported whenever
-/// words went missing, so the warning says what to do rather than only that something is wrong.
+/// The structures the missing words are sitting in, read from the document rather than from a
+/// fixed list, so a wrapper nobody anticipated names itself the first time it costs a word.
 /// </param>
 public sealed record TextCoverage(
     int SourceWords,
@@ -74,15 +74,13 @@ public static class TextCoverageReport
         "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
     /// <summary>
-    /// Wrappers docmd's transform does not descend into. Their text is in the document and not
-    /// in the output, so counting them turns "words are missing" into "here is why".
+    /// Elements that are ordinary document flow. Anything else wrapping a lost word is worth
+    /// naming, because it is the structure that explains the loss.
     /// </summary>
-    private static readonly (XName Name, string Describe)[] KnownUnreachable =
+    private static readonly HashSet<XName> PlainFlow =
     [
-        (Word + "txbxContent", "text box"),
-        (Word + "sdt", "inline content control"),
-        (Word + "fldSimple", "field"),
-        (Word + "smartTag", "smart tag"),
+        Word + "body", Word + "p", Word + "r", Word + "tbl", Word + "tr", Word + "tc",
+        Word + "hyperlink", Word + "ins", Word + "sdtContent",
     ];
 
     /// <summary>Compares a composite against the Markdown produced from it.</summary>
@@ -97,7 +95,7 @@ public static class TextCoverageReport
         var output = MarkdownTextReader.Words(markdown);
         var lost = Compare(source, output);
 
-        return new TextCoverage(source.Count, lost, lost.Count == 0 ? [] : CausesIn(composite));
+        return new TextCoverage(source.Count, lost, CausesIn(composite, lost));
     }
 
     /// <summary>The words a reader sees in the source document, in document order.</summary>
@@ -201,20 +199,53 @@ public static class TextCoverageReport
         return string.Join(' ', words.Skip(from).Take(to - from));
     }
 
-    private static IReadOnlyList<LossCause> CausesIn(XDocument composite)
+    /// <summary>
+    /// Names the structures the lost words are actually sitting in.
+    /// </summary>
+    /// <remarks>
+    /// Derived from where the missing words are, not from a list of constructs docmd is known to
+    /// skip. That list went stale the moment the transform learned to read text boxes: it kept
+    /// reporting "this document contains 118 text boxes, which docmd does not read" about
+    /// documents whose text boxes had been read correctly. A warning that says something false
+    /// is worse than no warning, and a hardcoded list of what we cannot handle is guaranteed to
+    /// be wrong eventually, in the direction that embarrasses us.
+    ///
+    /// Reading it from the document instead means a wrapper nobody has heard of names itself the
+    /// first time it costs someone a word.
+    /// </remarks>
+    private static IReadOnlyList<LossCause> CausesIn(XDocument composite, List<LostWord> lost)
     {
         var body = composite.Root?.Element(WordNames.Docmd + "body");
-        if (body is null)
+        if (body is null || lost.Count == 0)
         {
             return [];
         }
 
-        return [.. KnownUnreachable
-            .Select(candidate => new LossCause(
-                candidate.Describe,
-                body.Descendants(candidate.Name).Count()))
-            .Where(cause => cause.Count > 0)
-            .OrderByDescending(cause => cause.Count)];
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var word in lost.Take(50))
+        {
+            var carrier = body.Descendants(Word + "t")
+                .FirstOrDefault(t => t.Value.Contains(word.Word, StringComparison.Ordinal));
+            if (carrier is null)
+            {
+                continue;
+            }
+
+            foreach (var name in carrier.Ancestors()
+                         // WordprocessingML only: the composite's own docmd: wrappers are
+                         // ancestors of every node in it, so without this every loss would
+                         // report "package" and "body" as though they explained something.
+                         .Where(a => a.Name.Namespace == Word && !PlainFlow.Contains(a.Name))
+                         .Select(a => a.Name.LocalName)
+                         .Distinct(StringComparer.Ordinal))
+            {
+                counts[name] = counts.GetValueOrDefault(name) + 1;
+            }
+        }
+
+        return [.. counts.OrderByDescending(c => c.Value)
+                         .ThenBy(c => c.Key, StringComparer.Ordinal)
+                         .Select(c => new LossCause(c.Key, c.Value))];
     }
 
     /// <summary>
@@ -253,7 +284,9 @@ public static class TextCoverageReport
         {
             lines.Add(string.Create(
                 CultureInfo.InvariantCulture,
-                $"!   this document contains {cause.Count} {cause.Construct}(s), which docmd does not read."));
+                cause.Count == 1
+                    ? $"!   one of them sits inside <{cause.Construct}>."
+                    : $"!   {cause.Count} of them sit inside <{cause.Construct}>."));
         }
 
         return lines;
