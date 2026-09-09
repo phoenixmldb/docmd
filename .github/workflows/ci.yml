@@ -25,6 +25,30 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Commit messages are checked below, so the log has to be there to check.
+          fetch-depth: 50
+
+      # A corpus document's filename names the customer. The build fails on one appearing in a
+      # tracked file (NoRealDocumentNamesTests); this covers commit messages, which are the
+      # half that cannot be corrected after publication without rewriting history.
+      - name: Refuse a real document name in commit messages
+        run: |
+          allowed=$(grep -vE '^\s*(#|$)' .allowed-document-names | tr 'A-Z' 'a-z' | tr -d ' ')
+          found=$(git log --pretty=%B -n 30 \
+            | grep -oiE '\b[A-Za-z0-9][A-Za-z0-9._-]*\.(docx|docm|dotx|dotm)\b' \
+            | tr 'A-Z' 'a-z' | sort -u || true)
+          bad=""
+          for name in $found; do
+            echo "$allowed" | grep -qxF "$name" || bad="$bad $name"
+          done
+          if [ -n "$bad" ]; then
+            echo "Commit messages name documents that are not on the allow-list:$bad"
+            echo "Corpus documents belong to customers and their filenames identify them."
+            echo "Describe the document instead, or add the name to .allowed-document-names."
+            exit 1
+          fi
+          echo "commit messages: no real document names"
 
       - uses: actions/setup-dotnet@v4
         with:

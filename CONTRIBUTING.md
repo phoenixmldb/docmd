@@ -71,6 +71,24 @@ rather than gates: on the sample it was built against, 43 of 49 documents lose n
 residue is 12 words, with causes recorded in [docs/limitations.md](docs/limitations.md). Its one
 hard assertion is that no document *throws*, because an exception ends a batch run.
 
+## Never name a real document
+
+docmd is developed against corpora of real business documents. Those documents are not in this
+repository and must not be identifiable from it. A corpus filename typically carries the client
+name, the project and a revision, which together say more about who we work with than any of our
+documentation intends to.
+
+Describe the document instead — "a 1,000-paragraph design document", "a 2008 program guide".
+
+This is enforced rather than remembered. `NoRealDocumentNamesTests` fails the build on a document
+name in any tracked `.md`, `.cs`, `.xslt`, `.yml` or `.csproj` file, and CI applies the same list
+to commit messages, which are the half nobody can correct after publication without rewriting
+history. Both read `.allowed-document-names`; adding to it is a reviewed change.
+
+It exists because a defect report cited a customer document by filename and reached the default
+branch. Removing it meant rewriting published history, which is cheap only while a repository is
+private.
+
 ## Working on the stylesheet
 
 `src/Docmd.Word/Stylesheets/markdown.xslt` is the semantic recovery layer and where most of the
