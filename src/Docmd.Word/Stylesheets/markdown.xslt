@@ -323,11 +323,24 @@
         select=".//w:txbxContent[not(ancestor::w:txbxContent)][not(ancestor::mc:Fallback)]/w:p"/>
   </xsl:template>
 
+  <!--
+    Rows and cells are found by descent rather than as children, because they are frequently
+    not children. Word wraps them in w:customXml (the Word 2003 custom markup that predates
+    content controls) and in block level w:sdt, either of which sits between a table and its
+    rows and between a row and its cells. Selecting w:tr as a child silently produced an empty
+    table: one invoice lost every line item that way, 72 of its 184 words.
+
+    Nearest-ancestor identity rather than a bare .//w:tr, so a nested table's rows belong to the
+    nested table and are not also claimed by the outer one. Nested tables are flattened into the
+    containing cell further down, and claiming their rows twice would print them twice.
+  -->
   <xsl:template match="w:tbl">
+    <xsl:variable name="table" select="."/>
     <md:table>
-      <xsl:for-each select="w:tr">
+      <xsl:for-each select=".//w:tr[ancestor::w:tbl[1] is $table]">
+        <xsl:variable name="row" select="."/>
         <md:row header="{if (position() eq 1) then 'true' else 'false'}">
-          <xsl:for-each select="w:tc">
+          <xsl:for-each select=".//w:tc[ancestor::w:tr[1] is $row]">
             <md:cell>
               <!--
                 A vMerge continuation carries the visual span, not content. w:val='restart'

@@ -25,8 +25,27 @@ using Markdig.Syntax.Inlines;
 /// </remarks>
 public static class MarkdownTextReader
 {
+    /// <summary>
+    /// A pipeline shaped like the flavour docmd emits, not the widest one Markdig offers.
+    /// </summary>
+    /// <remarks>
+    /// UseAdvancedExtensions turns on list extras, which read "a." and "i." at the start of a
+    /// line as ordered-list markers. GFM does not, so docmd correctly leaves them as text, and
+    /// a reader configured that way then reported every one of them as a word the conversion
+    /// had lost: 44 of them in one deployment runbook whose steps are lettered. Holding the
+    /// output to a grammar wider than the one it targets manufactures losses that are not there.
+    ///
+    /// Emphasis extras are limited to strikethrough for the same reason: the rest add
+    /// subscript, superscript and inserted-text syntax that GFM has no notion of, so a caret or
+    /// a tilde in ordinary prose would be read as markup and its neighbours reported missing.
+    /// </remarks>
     private static readonly MarkdownPipeline Pipeline =
-        new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+        new MarkdownPipelineBuilder()
+            .UsePipeTables()
+            .UseAutoLinks()
+            .UseTaskLists()
+            .UseEmphasisExtras(Markdig.Extensions.EmphasisExtras.EmphasisExtraOptions.Strikethrough)
+            .Build();
 
     /// <summary>The words a reader sees, in document order.</summary>
     public static IReadOnlyList<string> Words(string markdown)

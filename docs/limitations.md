@@ -11,9 +11,14 @@ that did not survive. On the 49-document sample it was built against:
 | | |
 |---|---|
 | Documents converted | 49 of 49, none failed |
-| Documents losing not one word | **40** |
-| Words lost, all documents | **207** — about 0.15% of the corpus |
-| Worst document | a 184-word invoice losing 72 |
+| Documents losing not one word | **43** |
+| Words lost, all documents | **12** — under 0.01% of the corpus |
+| Worst document | 3 words |
+
+The residual twelve are single words in six documents, and each is a tokenisation edge rather
+than a construct docmd cannot read: a path with backslashes, a SQL identifier carrying commas
+and parentheses, an ellipsis-truncated URL. They are recorded because the check reports them,
+not because a reader would notice.
 
 The entries below are what accounts for the rest.
 
