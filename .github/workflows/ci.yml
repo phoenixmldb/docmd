@@ -36,7 +36,7 @@ jobs:
         run: |
           allowed=$(grep -vE '^\s*(#|$)' .allowed-document-names | tr 'A-Z' 'a-z' | tr -d ' ')
           found=$(git log --pretty=%B -n 30 \
-            | grep -oiE '\b[A-Za-z0-9][A-Za-z0-9._-]*\.(docx|docm|dotx|dotm)\b' \
+            | grep -oiE '\b[A-Za-z0-9][A-Za-z0-9._-]*\.(docx|docm|dotx|dotm|pptx|pptm|potx|ppt|xlsx|xlsm|doc)\b' \
             | tr 'A-Z' 'a-z' | sort -u || true)
           bad=""
           for name in $found; do

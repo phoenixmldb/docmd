@@ -45,7 +45,7 @@ public sealed class NoRealDocumentNamesTests
     /// "March 10.docx" still trips on its "10.docx" tail rather than slipping through.
     /// </summary>
     private static readonly Regex DocumentName =
-        new(@"\b[A-Za-z0-9][A-Za-z0-9._-]*\.(?:docx|docm|dotx|dotm)\b",
+        new(@"\b[A-Za-z0-9][A-Za-z0-9._-]*\.(?:docx|docm|dotx|dotm|pptx|pptm|potx|ppt|xlsx|xlsm|doc)\b",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static readonly string[] Scanned = [".md", ".cs", ".xslt", ".yml", ".yaml", ".csproj"];

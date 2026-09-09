@@ -5,7 +5,8 @@
 # project, and sometimes the deal. A defect report once cited one by name and reached the
 # default branch, and removing it meant rewriting published history.
 #
-# Anything ending .docx/.docm/.dotx/.dotm that is not listed here fails the build. If you need
+# Anything that looks like a Word, PowerPoint or Excel filename and is not listed here fails
+# the build. Presentations are covered because pptx work begins against real decks. If you need
 # to refer to a real document, describe it instead: "a 1,000-paragraph design document".
 #
 # One name per line. Case-insensitive. Blank lines and # comments ignored.
@@ -30,3 +31,10 @@ my.docx
 handbook.docx
 quarterly-review.docx
 document.docx
+
+# Placeholders for presentation work
+deck.pptx
+slides.pptx
+presentation.pptx
+sample.pptx
+legacy.doc
