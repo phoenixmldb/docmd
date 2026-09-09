@@ -44,9 +44,9 @@ budget it relied on never fired, and only breaking the code on purpose revealed 
 
 - `MarkdigOracleTests` serialises, re-parses with an independent Markdown implementation, and
   compares — so escaping bugs are caught by one mechanism rather than one test per character.
-- `TextPreservationOracle` checks that every word a reader sees in the `.docx` still appears, in
-  order, in the Markdown. This is the end-to-end correctness check; it found two real defects on
-  its first corpus run.
+- `TextCoverageReport` checks that every word a reader sees in the `.docx` still appears in the
+  Markdown. This is the end-to-end correctness check, and it ships: docmd reports coverage on
+  every conversion rather than only under test.
 
 **Beware the vacuous pass.** Several tests in this repository would once have passed while
 proving nothing. If your test could pass with the feature deleted, it is not testing the feature.
@@ -67,9 +67,9 @@ $ DOCMD_CORPUS=/path/to/docx/folder dotnet test tests/Docmd.Word.Tests \
 ```
 
 It writes a report naming every document that lost text and the first words lost. It reports
-rather than gates: on the sample it was built against, 36 of 49 documents lose nothing and the
-other 13 fail for reasons recorded in [docs/limitations.md](docs/limitations.md). Its one hard
-assertion is that no document *throws*, because an exception ends a batch run.
+rather than gates: on the sample it was built against, 43 of 49 documents lose nothing and the
+residue is 12 words, with causes recorded in [docs/limitations.md](docs/limitations.md). Its one
+hard assertion is that no document *throws*, because an exception ends a batch run.
 
 ## Working on the stylesheet
 

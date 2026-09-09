@@ -40,15 +40,20 @@ public sealed class TransformScalingTests
     private const string W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
     /// <summary>
     /// Wall-clock budget for a single transform. Overridable because the value is a trade
-    /// between two failure modes: too low and a slow or loaded CI runner fails a healthy
-    /// build, which costs more trust than the gate is worth; too high and a genuine hang
-    /// takes longer to report. CI raises it. Detection does not depend on this number -- the
-    /// ratio assertion below catches the regression either way, just less quickly.
+    /// between two failure modes: too low and a loaded machine fails a healthy build, which
+    /// costs more trust than the gate is worth; too high and a genuine hang takes longer to
+    /// report. Detection does not depend on this number at all -- the ratio assertion below
+    /// catches a complexity regression either way, just less quickly.
+    ///
+    /// It sits at 60s because 25s was not enough headroom. A 1,000 paragraph transform takes
+    /// about 4 seconds alone and several times that while the rest of the suite saturates the
+    /// CPU beside it, and the gate failed healthy builds twice. A budget that fires on correct
+    /// code teaches people to rerun until it passes, which is worse than not having one.
     /// </summary>
     private static readonly int Budget =
         int.TryParse(Environment.GetEnvironmentVariable("DOCMD_PERF_BUDGET_MS"), out var ms)
             ? ms
-            : 25_000;
+            : 60_000;
 
     private static string Composite(int paragraphs)
     {

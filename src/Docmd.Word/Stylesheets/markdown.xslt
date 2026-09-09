@@ -320,7 +320,7 @@
       </md:para>
     </xsl:if>
     <xsl:apply-templates
-        select=".//w:txbxContent[not(ancestor::w:txbxContent)][not(ancestor::mc:Fallback)]/w:p"/>
+        select=".//w:txbxContent[not(ancestor::w:txbxContent) and not(ancestor::mc:Fallback)]/w:p"/>
   </xsl:template>
 
   <!--
@@ -556,12 +556,28 @@
   -->
   <xsl:function name="docmd:own-text" as="xs:string">
     <xsl:param name="node" as="node()"/>
-    <xsl:sequence select="string-join(
-        for $n in $node//*[self::w:t or self::w:tab or self::w:br]
-                          [not(ancestor::w:del)
-                           and empty(ancestor::w:txbxContent intersect $node//w:txbxContent)]
-        return if ($n/self::w:t) then string($n) else ' ',
-        '')"/>
+    <!--
+      The boxes are found ONCE. Writing $node//w:txbxContent inside the predicate re-evaluated
+      it for every text node in the paragraph, which is quadratic in paragraph size, and this
+      function is called from a match pattern so it runs for every paragraph in the document.
+      It took a 1,000 paragraph transform from 3 seconds to over 25, and the performance gate
+      caught it on the commit that introduced it.
+    -->
+    <xsl:variable name="boxes" select="$node//w:txbxContent"/>
+    <xsl:choose>
+      <!-- The overwhelmingly common case: no text box, so nothing to exclude. -->
+      <xsl:when test="empty($boxes)">
+        <xsl:sequence select="docmd:visible-text($node)"/>
+      </xsl:when>
+      <xsl:otherwise>
+        <xsl:sequence select="string-join(
+            for $n in $node//*[self::w:t or self::w:tab or self::w:br]
+                              [not(ancestor::w:del)
+                               and empty(ancestor::w:txbxContent intersect $boxes)]
+            return if ($n/self::w:t) then string($n) else ' ',
+            '')"/>
+      </xsl:otherwise>
+    </xsl:choose>
   </xsl:function>
 
   <xsl:function name="docmd:visible-text" as="xs:string">
