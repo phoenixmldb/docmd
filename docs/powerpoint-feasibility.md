@@ -1,5 +1,8 @@
 # PowerPoint: what a `.pptx` front end would actually cost
 
+**Status: tabled 2026-09-09.** Feasible, measured, and deliberately not started. See the decision
+below. Spreadsheets are ruled out permanently.
+
 Findings from surveying **40 real decks, 960 slides**, drawn at random from a 337-file collection.
 Written before any code, so the scope is argued from measurement rather than from the spec.
 
@@ -102,19 +105,24 @@ produces a directory of 40 stubs for a 40-slide deck.
 This is a chunking decision dressed as a file-layout decision, and it should be made against a
 real index rather than in the abstract.
 
-## Recommendation
+## Decision, 2026-09-09
 
-**One tool, dispatching on extension** — `docmd deck.pptx` should work. Real document stores are
-mixed, and a corpus conversion wants one pass over one folder. Structurally that is
-`Docmd.Presentation` beside `Docmd.Word`, both feeding `Ooxml.Md.Core`, with the CLI selecting.
-The extension points (`--stylesheet`, `--style-map`, `IAssetSink`) stay learned once.
+**PowerPoint is tabled.** Not rejected — the survey says it is feasible and the plumbing is
+already there — but not started while the Word side is unreleased. Reading order is novel work
+with no equivalent in what exists, and beginning it now would widen an unfinished front. This
+document is the input to restarting it, which is why the measurements are here rather than in a
+chat log.
 
-**Not until the Word side is released and stable.** The reading-order heuristic is genuinely
-novel work with no equivalent in what exists, and starting it now widens an unfinished front.
+**Spreadsheets are out of scope, permanently.** `.xlsx` shares OPC and looks adjacent, which is
+exactly why it needs saying once rather than being reconsidered every quarter. A spreadsheet is a
+grid without prose: the output would be tables with no narrative, close to worthless for
+retrieval, and it would earn "docmd handles Excel badly" as a review while adding a format to
+maintain. Anyone tempted should read this paragraph first.
 
-**Do not attempt `.xlsx`.** It shares OPC and looks adjacent, but a spreadsheet is a grid with no
-prose. The output would be tables with no narrative, which is close to worthless for retrieval
-and invites "docmd handles Excel badly" as a review.
+**When PowerPoint restarts, it is one tool dispatching on extension.** `docmd deck.pptx` should
+work. Real document stores are mixed and a corpus conversion wants one pass over one folder.
+Structurally that is `Docmd.Presentation` beside `Docmd.Word`, both feeding `Ooxml.Md.Core`, with
+the CLI selecting. The extension points stay learned once.
 
 ## What to build first, when the time comes
 

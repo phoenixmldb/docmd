@@ -218,8 +218,8 @@ each cost real time.
   shaped the way it is
 - [Extending docmd](docs/extending.md) — style maps, custom stylesheets, and writing an
   `IAssetSink` to send images somewhere other than disk
-- [PowerPoint feasibility](docs/powerpoint-feasibility.md) — what a `.pptx` front end would cost,
-  measured against 960 real slides rather than argued from the spec
+- [PowerPoint feasibility](docs/powerpoint-feasibility.md) — measured against 960 real slides.
+  **Tabled**; spreadsheets are out of scope permanently, and that file says why
 - [Limitations](docs/limitations.md) — what is knowingly dropped and how large a document gets
   before conversion slows down, both measured rather than guessed
 - [Deferred work](docs/deferred-work.md) — findings recorded instead of fixed, and why

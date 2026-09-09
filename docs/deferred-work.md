@@ -60,6 +60,13 @@ already dead, while the anchor text survives. Recorded so the corpus audit can r
 - `docmd audit`, `-r`/`--recursive`, `--review`, `--style-map`, `--strict`, `--report` and
   `--revisions` all currently fail cleanly as not-yet-supported.
 
+## Formats
+
+**PowerPoint is tabled, not rejected.** Scoped against 960 real slides in
+[`powerpoint-feasibility.md`](powerpoint-feasibility.md); restart from there rather than from
+scratch. **Spreadsheets are out of scope permanently** — the reasoning is in the same file, and
+it is written down precisely because `.xlsx` will keep looking adjacent.
+
 ## A checklist worth keeping
 
 Three separate defects in this build shared one shape: **an element being present was read as the
