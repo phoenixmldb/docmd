@@ -282,11 +282,11 @@ public static class TextCoverageReport
 
         foreach (var cause in coverage.Causes)
         {
-            lines.Add(string.Create(
-                CultureInfo.InvariantCulture,
-                cause.Count == 1
-                    ? $"!   one of them sits inside <{cause.Construct}>."
-                    : $"!   {cause.Count} of them sit inside <{cause.Construct}>."));
+            lines.Add(cause.Count == 1
+                ? $"!   one of them sits inside <{cause.Construct}>."
+                : string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"!   {cause.Count} of them sit inside <{cause.Construct}>."));
         }
 
         return lines;
