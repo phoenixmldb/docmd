@@ -95,4 +95,4 @@ jobs:
         run: |
           dotnet run --project src/Docmd.Cli --no-build -c Release -- --version
           dotnet run --project src/Docmd.Cli --no-build -c Release -- --print-stylesheet \
-            | python3 -c "import sys, xml.dom.minidom; xml.dom.minidom.parseString(sys.stdin.read()); print('stylesheet parses')"
+            | python3 -c "import sys,xml.parsers.expat; p=xml.parsers.expat.ParserCreate(); p.Parse(sys.stdin.buffer.read(),True); print('embedded stylesheet parses')"

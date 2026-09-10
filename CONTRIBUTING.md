@@ -192,7 +192,16 @@ $ ./verify/docmd --version && ./verify/docmd sample.docx -o /tmp/check
 
 Install from the package before pushing it. Building a library proves less than it looks: the
 stylesheet is an embedded resource, so a packaging mistake shows up when the tool runs and
-nowhere earlier.
+nowhere earlier. `.github/workflows/release.yml` does this step for you and refuses to publish
+if it fails, so the rule is enforced rather than remembered.
+
+**Publishing is driven by a tag.** Push `v<version>` and the release workflow packs, tests,
+installs from the package, runs it, and publishes. It refuses if the tag disagrees with
+`<Version>` in `Directory.Build.props`, because a tag that disagrees ships a package whose
+number means nothing. A manual run of the workflow packs and verifies without publishing.
+
+Credentials: none. nuget.org trusted publishing exchanges the workflow's own OIDC identity for
+a short-lived key, so there is no API key stored in the repository to leak or rotate.
 
 Then tag (`v<version>`), and update `CHANGELOG.md` — moving the entry out of `Unreleased` and
 dating it — before the tag rather than after, so the tag points at the changelog it describes.

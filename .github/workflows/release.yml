@@ -1,0 +1,105 @@
+name: Release
+
+# Publishing is driven by a tag, so the thing published is always a commit that exists and can
+# be checked out again. A manual run is available for a dry run, which packs and verifies but
+# does not push.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Pack and verify without publishing'
+        type: boolean
+        default: true
+
+permissions:
+  # Required for NuGet trusted publishing: the job proves its identity to nuget.org with a
+  # short-lived OIDC token instead of a long-lived API key stored as a secret.
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # A tag that disagrees with the version in the tree publishes a package whose number
+      # means nothing. Catch it before anything is built, not after it is on nuget.org.
+      - name: Tag must match the version in the tree
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tree=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
+          tag="${GITHUB_REF_NAME#v}"
+          echo "tree=$tree tag=$tag"
+          if [ "$tree" != "$tag" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match <Version>$tree</Version>."
+            exit 1
+          fi
+
+      - name: Restore (locked)
+        run: dotnet restore docmd.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build docmd.slnx --no-restore -c Release
+
+      # The full suite, including the performance gate, which runs alone for the same reason
+      # it does in CI: timing a transform while another assembly saturates the CPU measures
+      # the runner rather than the code.
+      - name: Test
+        run: >
+          dotnet test docmd.slnx --no-build -c Release
+          --filter "FullyQualifiedName!~TransformScaling"
+
+      - name: Performance gate
+        env:
+          DOCMD_PERF_BUDGET_MS: 90000
+        run: >
+          dotnet test tests/Docmd.Word.Tests --no-build -c Release
+          --filter "FullyQualifiedName~TransformScaling"
+
+      - name: Pack
+        run: dotnet pack src/Docmd.Cli --no-build -c Release -o ./artifacts
+
+      # CONTRIBUTING requires installing from the package before pushing it, and this is that
+      # rule made unskippable. Building a library proves less than it looks here: the
+      # stylesheet ships as an embedded resource, so a packaging mistake surfaces when the
+      # tool runs and nowhere earlier.
+      - name: Install from the package and run it
+        run: |
+          version=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
+          dotnet tool install --tool-path ./verify --add-source ./artifacts Docmd.Cli --version "$version"
+          ./verify/docmd --version
+          ./verify/docmd --print-stylesheet \
+            | python3 -c "import sys,xml.parsers.expat; p=xml.parsers.expat.ParserCreate(); p.Parse(sys.stdin.buffer.read(),True); print('embedded stylesheet parses')"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: ./artifacts/*.nupkg
+
+      # Trusted publishing: exchange the workflow's OIDC identity for a short-lived key. No
+      # API key is stored anywhere, so there is nothing to leak or rotate.
+      - name: Authenticate to NuGet
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Publish
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: >
+          dotnet nuget push ./artifacts/*.nupkg
+          --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
