@@ -24,7 +24,7 @@ jobs:
       DOCMD_PERF_BUDGET_MS: 90000
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Commit messages are checked below, so the log has to be there to check.
           fetch-depth: 50
