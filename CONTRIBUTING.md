@@ -143,6 +143,26 @@ person from repeating the search.
   a document corpus is a property worth protecting; changing it is sometimes right, but never
   accidental.
 
+## Writing documentation
+
+Review feedback on a draft found the same three faults repeatedly, and they are worth naming
+because they are easy to commit and hard to see in your own prose.
+
+**Jargon before definition.** "Which run is emphasis" is meaningless to anyone who has not read
+the OOXML specification, and it appeared in three of our documents. Either define the term where
+it first appears or use plain words: *which stretch of text is bold*. A reader who has to look
+something up to follow a sentence usually stops instead.
+
+**Vague reference.** "It says so", "the measurement", "that detail" — clear to the author, who
+knows what the antecedent is, and opaque to a reader meeting it for the first time. Name the
+thing.
+
+**Claims without the concrete thing behind them.** "It reports what it could not read" is a
+promise; the actual four lines of stderr output are evidence, and they are shorter. The same
+goes for "it emits a semantic vocabulary" versus twelve lines of md-XML beside the Markdown it
+becomes. Where a claim can be shown, show it — and generate the sample from the running code
+rather than writing it by hand, because a hand-written example drifts and nobody notices.
+
 ## Numbers in documentation
 
 Two kinds, and they are governed differently.

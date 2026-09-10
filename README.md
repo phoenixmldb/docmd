@@ -4,8 +4,8 @@ Converts Microsoft Word documents to Markdown — for AI/RAG indexing, for readi
 
 **The conversion is a stylesheet, and it is meant to be read:**
 [`src/Docmd.Word/Stylesheets/markdown.xslt`](src/Docmd.Word/Stylesheets/markdown.xslt) — a
-single file of XSLT 3.0 deciding which paragraph is a heading, which run is emphasis, and how a
-Word list becomes a Markdown one. `docmd --print-stylesheet` emits the copy that actually ran, so
+single file of XSLT 3.0 deciding which paragraph is a heading, which stretch of text is bold or
+italic, and how a Word list becomes a Markdown one. `docmd --print-stylesheet` emits the copy that actually ran, so
 you can edit it and hand it back with `--stylesheet`. There is no compiled-in behaviour to
 reverse-engineer.
 
@@ -184,7 +184,7 @@ the uses docmd left alone — a style it already read as a heading is not a gap 
 it stays quiet unless you passed a map, since it is advice about a feature you asked for.
 
 `src/Docmd.Word/Stylesheets/markdown.xslt` is the whole semantic-recovery layer: which paragraph
-is a heading, which run is bold, how a Word list becomes a Markdown one. It is one readable
+is a heading, which stretch of text is bold, how a Word list becomes a Markdown one. It is one readable
 file, and it is meant to be read.
 
 The stylesheet's own directory is its base URI, so if you split your overrides across files, a

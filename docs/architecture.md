@@ -73,8 +73,8 @@ order, so the same heading text twice yields `scope` then `scope-1`, and anchors
 
 ## 4. The transform, and the md-XML vocabulary
 
-`markdown.xslt` is the semantic recovery layer: which paragraph is a heading, which run is
-emphasis, how a Word list becomes a Markdown one. It is about 590 lines and it is meant to be
+`markdown.xslt` is the semantic recovery layer: which paragraph is a heading, which stretch of
+text is emphasis, how a Word list becomes a Markdown one. It is about 590 lines and it is meant to be
 read — and replaced, see [extending.md](extending.md).
 
 It does **not** emit Markdown. It emits a small XML vocabulary:
@@ -83,9 +83,23 @@ It does **not** emit Markdown. It emits a small XML vocabulary:
 <md:document>
   <md:heading level="1" slug="scope"><md:text>Scope</md:text></md:heading>
   <md:para><md:text>See </md:text><md:strong><md:text>section 4</md:text></md:strong></md:para>
-  <md:list ordered="true"><md:item><md:para>…</md:para></md:item></md:list>
+  <md:list ordered="true"><md:item><md:para><md:text>Disconnect power</md:text></md:para></md:item></md:list>
 </md:document>
 ```
+
+And the serialiser turns exactly that into:
+
+```markdown
+# Scope
+
+See **section 4**
+
+1. Disconnect power
+```
+
+Nothing in the stylesheet's output is Markdown: no asterisks, no hashes, no escaping decisions.
+`@slug` and `@ordered` show the shape of the split — the stylesheet has already decided the hard
+things, and the serialiser only writes them down.
 
 The separation matters more than it looks. Markdown is whitespace-significant and
 context-sensitive: whether `_` starts emphasis depends on what is adjacent to it, whether four
