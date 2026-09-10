@@ -3,8 +3,8 @@
 Converts Microsoft Word documents to Markdown — for AI/RAG indexing, for reading, or both.
 
 **The conversion is a stylesheet, and it is meant to be read:**
-[`src/Docmd.Word/Stylesheets/markdown.xslt`](src/Docmd.Word/Stylesheets/markdown.xslt) — about
-590 lines of XSLT 3.0 deciding which paragraph is a heading, which run is emphasis, and how a
+[`src/Docmd.Word/Stylesheets/markdown.xslt`](src/Docmd.Word/Stylesheets/markdown.xslt) — a
+single file of XSLT 3.0 deciding which paragraph is a heading, which run is emphasis, and how a
 Word list becomes a Markdown one. `docmd --print-stylesheet` emits the copy that actually ran, so
 you can edit it and hand it back with `--stylesheet`. There is no compiled-in behaviour to
 reverse-engineer.
@@ -66,6 +66,33 @@ What survives because nothing is discarded first:
 Heading structure is not cosmetic here. Markdown-aware chunkers split on `#` levels and attach the
 heading path to each chunk, so a missed heading silently merges two chunks and a false one shatters
 a paragraph.
+
+## Measured behaviour
+
+Numbers here are a dated measurement against a fixed corpus, not a running total: 49 real
+business documents spanning 2008 to 2024 — statements of work, invoices, program guides,
+deployment runbooks — measured 2026-09-10 on docmd 0.1.0.
+
+| | |
+|---|---|
+| Converted without error | **49 of 49** |
+| Lost not one word | **43** |
+| Total words lost | **12** — under 0.01% of the corpus |
+| Worst single document | 3 words |
+| 1,000-paragraph document | ~20 s |
+| 11,000-paragraph document | ~5 min |
+
+docmd checks this on every conversion, not just under test: it compares the words a reader can
+see in the `.docx` against the words a Markdown parser recovers from the output, and reports any
+that did not survive. Silent when nothing was lost.
+
+[`docs/limitations.md`](docs/limitations.md) is the canonical account — what the twelve words
+were, what causes each remaining loss, and where conversion cost stops being linear. Reproduce
+any of it against your own documents:
+
+```console
+$ DOCMD_CORPUS=/path/to/docx dotnet test tests/Docmd.Word.Tests --filter "FullyQualifiedName~Corpus_Audit"
+```
 
 ## Determinism
 
@@ -157,8 +184,8 @@ the uses docmd left alone — a style it already read as a heading is not a gap 
 it stays quiet unless you passed a map, since it is advice about a feature you asked for.
 
 `src/Docmd.Word/Stylesheets/markdown.xslt` is the whole semantic-recovery layer: which paragraph
-is a heading, which run is bold, how a Word list becomes a Markdown one. It is about 590 lines and
-it is meant to be read.
+is a heading, which run is bold, how a Word list becomes a Markdown one. It is one readable
+file, and it is meant to be read.
 
 The stylesheet's own directory is its base URI, so if you split your overrides across files, a
 relative `xsl:import` resolves against where those files live rather than against wherever you
@@ -186,7 +213,7 @@ recovery layer, and it runs on [PhoenixmlDb.Xslt](https://www.nuget.org/packages
 an XSLT 3.0/4.0 processor written from scratch in .NET, Apache-2.0, no Java, no Saxon licence.
 
 Building a real product on it found a real bug in it: `xsl:for-each` over a range whose operand is
-an `xs:integer` cast from a string crashes 1.6.15 with an unhandled `InvalidCastException`. The
+an `xs:integer` cast from a string crashes the engine with an unhandled `InvalidCastException`. The
 characterisation and a self-contained repro are in
 [`docs/engine-defects/`](docs/engine-defects/) — including the reason a conformance suite never
 caught it, which is that the literal-operand form passes and only an attribute-sourced count fails.
@@ -196,7 +223,7 @@ That is the argument for dogfooding over conformance testing, in one bug.
 
 ```console
 $ dotnet build docmd.slnx
-$ dotnet test  docmd.slnx        # 350 tests; 1 skipped is the opt-in corpus audit
+$ dotnet test  docmd.slnx        # one skip: the corpus audit, opt in with DOCMD_CORPUS
 $ dotnet run --project src/Docmd.Cli -- sample.docx -o out/
 ```
 

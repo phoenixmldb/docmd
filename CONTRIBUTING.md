@@ -143,6 +143,22 @@ person from repeating the search.
   a document corpus is a property worth protecting; changing it is sometimes right, but never
   accidental.
 
+## Numbers in documentation
+
+Two kinds, and they are governed differently.
+
+**A fact the code owns** — how many tests there are, how long the stylesheet is, which engine
+version is pinned — does not belong in prose. It drifts on the next commit and nobody notices.
+Three different lengths for one file were in this repository at once. Describe it and link to
+it; the file is the fact.
+
+**A dated measurement against a fixed corpus** is different: it does not drift, because it says
+what was measured, against what, and when. Those are welcome, with the date, the corpus, and a
+link to the canonical account in [docs/limitations.md](docs/limitations.md).
+
+The test for which kind you have: if a routine commit could make the sentence false without
+anybody touching that sentence, it is the first kind.
+
 ## Releasing
 
 The version lives once, in `Directory.Build.props`. `dotnet pack src/Docmd.Cli` produces the
