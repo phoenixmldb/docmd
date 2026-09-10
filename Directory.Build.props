@@ -27,8 +27,14 @@
     <Copyright>Copyright © Endpoint Systems 2026</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
-    <RepositoryUrl>https://github.com/endpointsystems/docmd</RepositoryUrl>
-    <PackageProjectUrl>https://github.com/endpointsystems/docmd</PackageProjectUrl>
+    <!--
+      phoenixmldb, not endpointsystems: docmd is a consumer of the PhoenixmlDb engines and
+      belongs beside them and beside crucible, which is the same shape of tool. These two
+      values are embedded in the published package, so they had to be right before the first
+      push to nuget.org rather than corrected afterwards.
+    -->
+    <RepositoryUrl>https://github.com/phoenixmldb/docmd</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/phoenixmldb/docmd</PackageProjectUrl>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <!-- Deterministic in every configuration, not just Release: docmd's own output
