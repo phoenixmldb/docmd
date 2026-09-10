@@ -60,6 +60,32 @@ already dead, while the anchor text survives. Recorded so the corpus audit can r
 - `docmd audit`, `-r`/`--recursive`, `--review`, `--style-map`, `--strict`, `--report` and
   `--revisions` all currently fail cleanly as not-yet-supported.
 
+## xunit v3 4.0 needs a test-platform migration, not a version bump
+
+**Status:** open, deliberately deferred 2026-09-10. Pinned at xunit.v3 3.2.2.
+
+xunit.v3 4.0.0 drops VSTest support on the .NET 10 SDK and requires Microsoft.Testing.Platform:
+
+```
+error : Testing with VSTest target is no longer supported by Microsoft.Testing.Platform
+on .NET 10 SDK and later. If you use dotnet test, you should opt-in to the new dotnet
+test experience.
+```
+
+Setting `TestingPlatformDotnetTestSupport` is not sufficient on its own; the `dotnet test` CLI
+needs its own opt-in as well. Beyond that, MTP changes filter syntax, and `--filter
+"FullyQualifiedName~X"` appears in `.github/workflows/ci.yml` (which runs the performance gate as
+its own step), in `CONTRIBUTING.md` twice, and in the corpus-audit instructions. All of them
+change together or none do.
+
+Deferred because it is orthogonal to shipping, and a hurried test-infrastructure migration
+immediately before a first release is a poor trade: the thing that tells you whether the release
+is sound is the last thing to rebuild in a hurry. Nothing about 3.2.2 is broken.
+
+**Closes with:** `dotnet.config` selecting the MTP runner, the property above, the filter
+expressions rewritten in all four places, and a CI run proving the performance gate still runs
+in isolation.
+
 ## Formats
 
 **PowerPoint is tabled, not rejected.** Scoped against 960 real slides in
