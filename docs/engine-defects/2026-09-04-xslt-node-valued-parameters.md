@@ -1,5 +1,9 @@
 # PhoenixmlDb.Xslt 1.6.13 — a node passed to `SetParameter` is not usable as a node
 
+**Filed:** [phoenixmldb-xslt#12](https://github.com/phoenixmldb/phoenixmldb-xslt/issues/12) on 2026-09-10.
+**Re-verified on 1.6.15** that day: still reproduces, behaviour unchanged from 1.6.13.
+This file is the working detail; the issue is the report. Update both.
+
 Found by `docmd` while designing `--style-map`, which wanted to hand the stylesheet a small
 configuration document as an `xsl:param`. This is the ordinary XSLT way to pass structured
 configuration into a transform, and it does not work on this engine.

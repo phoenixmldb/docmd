@@ -224,7 +224,10 @@ each cost real time.
   before conversion slows down, both measured rather than guessed
 - [Deferred work](docs/deferred-work.md) — findings recorded instead of fixed, and why
 - [Engine defects](docs/engine-defects/) — bugs found in our own XSLT engine by building this on
-  it, with reproductions
+  it, with reproductions. All three are filed upstream as
+  [phoenixmldb-xslt#10](https://github.com/phoenixmldb/phoenixmldb-xslt/issues/10),
+  [#11](https://github.com/phoenixmldb/phoenixmldb-xslt/issues/11) and
+  [#12](https://github.com/phoenixmldb/phoenixmldb-xslt/issues/12)
 
 ## Licence
 
