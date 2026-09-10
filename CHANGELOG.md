@@ -9,7 +9,7 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
-## [0.1.0] — unreleased
+## [0.1.0] — 2026-09-10
 
 First release. Converts `.docx`, `.docm`, `.dotx` and `.dotm` to Markdown.
 
