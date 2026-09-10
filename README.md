@@ -2,6 +2,13 @@
 
 Converts Microsoft Word documents to Markdown — for AI/RAG indexing, for reading, or both.
 
+**The conversion is a stylesheet, and it is meant to be read:**
+[`src/Docmd.Word/Stylesheets/markdown.xslt`](src/Docmd.Word/Stylesheets/markdown.xslt) — about
+590 lines of XSLT 3.0 deciding which paragraph is a heading, which run is emphasis, and how a
+Word list becomes a Markdown one. `docmd --print-stylesheet` emits the copy that actually ran, so
+you can edit it and hand it back with `--stylesheet`. There is no compiled-in behaviour to
+reverse-engineer.
+
 ```console
 $ docmd report.docx -o out/
 ```
@@ -150,7 +157,7 @@ the uses docmd left alone — a style it already read as a heading is not a gap 
 it stays quiet unless you passed a map, since it is advice about a feature you asked for.
 
 `src/Docmd.Word/Stylesheets/markdown.xslt` is the whole semantic-recovery layer: which paragraph
-is a heading, which run is bold, how a Word list becomes a Markdown one. It is about 350 lines and
+is a heading, which run is bold, how a Word list becomes a Markdown one. It is about 590 lines and
 it is meant to be read.
 
 The stylesheet's own directory is its base URI, so if you split your overrides across files, a
@@ -179,7 +186,7 @@ recovery layer, and it runs on [PhoenixmlDb.Xslt](https://www.nuget.org/packages
 an XSLT 3.0/4.0 processor written from scratch in .NET, Apache-2.0, no Java, no Saxon licence.
 
 Building a real product on it found a real bug in it: `xsl:for-each` over a range whose operand is
-an `xs:integer` cast from a string crashes 1.6.13 with an unhandled `InvalidCastException`. The
+an `xs:integer` cast from a string crashes 1.6.15 with an unhandled `InvalidCastException`. The
 characterisation and a self-contained repro are in
 [`docs/engine-defects/`](docs/engine-defects/) — including the reason a conformance suite never
 caught it, which is that the literal-operand form passes and only an attribute-sourced count fails.
@@ -189,7 +196,7 @@ That is the argument for dogfooding over conformance testing, in one bug.
 
 ```console
 $ dotnet build docmd.slnx
-$ dotnet test  docmd.slnx        # 337 tests; 1 skipped is the opt-in corpus audit
+$ dotnet test  docmd.slnx        # 350 tests; 1 skipped is the opt-in corpus audit
 $ dotnet run --project src/Docmd.Cli -- sample.docx -o out/
 ```
 

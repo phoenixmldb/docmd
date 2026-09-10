@@ -74,7 +74,7 @@ order, so the same heading text twice yields `scope` then `scope-1`, and anchors
 ## 4. The transform, and the md-XML vocabulary
 
 `markdown.xslt` is the semantic recovery layer: which paragraph is a heading, which run is
-emphasis, how a Word list becomes a Markdown one. It is about 480 lines and it is meant to be
+emphasis, how a Word list becomes a Markdown one. It is about 590 lines and it is meant to be
 read — and replaced, see [extending.md](extending.md).
 
 It does **not** emit Markdown. It emits a small XML vocabulary:
