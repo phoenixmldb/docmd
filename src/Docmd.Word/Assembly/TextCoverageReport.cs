@@ -48,11 +48,17 @@ public sealed record TextCoverage(
 /// document for imperfect conversion — it converts, and it says what it could not carry across.
 /// </para>
 /// <para>
-/// Measured on a 49-document corpus, 38 documents lose nothing at all and total loss is about 3%
-/// of all text, of which one pathological document holds 71%: that file keeps 92% of its content
-/// inside text boxes. That is the shape this reporting exists for. Nearly every document is
-/// intact and needs no warning; the rare one that is badly wrong is badly wrong in a way docmd
-/// can see and describe.
+/// Measured on a 49-document sample: 43 lose nothing at all, and total loss is twelve words,
+/// under 0.01% of the text. The residue is single words in six documents, each a tokenisation
+/// edge — a place where "what counts as one word" differs between the document and the
+/// Markdown — rather than a construct docmd cannot read.
+/// </para>
+/// <para>
+/// Those figures are a dated measurement against a fixed corpus, not a running total; CI does
+/// not reproduce them, because the corpus is not in this repository. See docs/limitations.md
+/// for the itemised residue. The measurement earns its place by what it found rather than by
+/// the number: text boxes, content controls, fields, smart tags and the legacy w:customXml
+/// wrapper were each invisible until it reported words going missing inside them.
 /// </para>
 /// </remarks>
 public static class TextCoverageReport

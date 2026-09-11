@@ -169,9 +169,9 @@ public sealed class TextCoverageTests : IDisposable
 
     /// <summary>Audits a folder of real documents. Opt in with DOCMD_CORPUS.</summary>
     /// <remarks>
-    /// Reports rather than gates. On the 49-document sample it was built against, 27 lose
-    /// nothing and total loss is 529 words, about 0.4% of all text; the causes are recorded in
-    /// docs/limitations.md. Asserting zero here would be a test that cannot pass, which decays
+    /// Reports rather than gates. On the 49-document sample it was built against, 43 lose
+    /// nothing and total loss is twelve words, under 0.01% of all text; the causes are recorded
+    /// in docs/limitations.md. Asserting zero here would be a test that cannot pass, which decays
     /// into one nobody runs. Its one hard assertion is that no document throws, because an
     /// exception ends a batch run.
     /// </remarks>
