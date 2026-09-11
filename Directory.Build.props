@@ -18,7 +18,7 @@
       taken back. It also leaves room to change the md-XML vocabulary, which a custom stylesheet
       depends on.
     -->
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
     <Authors>Endpoint Systems</Authors>
     <Company>Endpoint Systems</Company>
     <Product>docmd</Product>

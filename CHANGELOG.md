@@ -9,6 +9,19 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-09-11
+
+Packaging only. No behaviour change.
+
+### Added
+
+- A readme in the package. `dotnet pack` had been warning `Readme missing` since the first
+  release, so the nuget.org gallery page carried nothing but the one-line description — the
+  first thing a .NET developer sees, and it said almost nothing. It is a package-specific
+  `PACKAGE.md` rather than the repository's README, because nuget.org renders no relative link
+  and every link into `docs/` would have been dead on that page.
+- Package metadata that was absent: licence expression, project URL, repository URL, and tags.
+
 ## [0.1.1] — 2026-09-11
 
 Documentation only. No behaviour change: the conversion, the CLI surface and the output are
