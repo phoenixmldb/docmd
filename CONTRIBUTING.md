@@ -71,6 +71,63 @@ rather than gates: on the sample it was built against, 43 of 49 documents lose n
 residue is 12 words, with causes recorded in [docs/limitations.md](docs/limitations.md). Its one
 hard assertion is that no document *throws*, because an exception ends a batch run.
 
+It skips when `DOCMD_CORPUS` is unset, via `Assert.SkipWhen` rather than an early `return` — so
+an absent corpus is recorded as a skip and never as a pass. **CI never sets it.** Nothing in
+continuous integration has ever converted a real document, and no coverage figure in this
+repository is defended by a build.
+
+### Building a corpus worth auditing
+
+The corpus is the only part of this project that cannot be written. Its value is entirely in
+containing things nobody anticipated — `w:customXml` wrapping table rows, smart tags, content
+controls were each found because a real document had one, not because anyone read the schema
+and thought to try.
+
+That is also why there is no synthetic corpus here and should not be one. A corpus you author
+can only contain constructs you already know about, so it gates against known cases while
+reading like coverage. It would have found none of the five constructs that mattered.
+
+What makes a folder useful:
+
+- **Documents nobody wrote for this.** Real work product, whatever shape it arrived in.
+- **A spread of ages.** Word's output has changed repeatedly; a 2009 `.docx` and a 2024 one
+  exercise different serialisers. Ours spans 2008 to 2024 and the old files find more.
+- **A spread of authoring tools.** LibreOffice, Google Docs export, and Word's own "save as"
+  from `.doc` all produce valid but distinctive markup.
+- **Templates with house styles**, which is where `--style-map` earns its keep.
+- **Size, last.** A hundred varied documents beat a thousand from one template.
+
+Fifty is plenty. Ours is 49.
+
+### Reporting what you find
+
+Both paths below need **nothing of your document**, and please do not send one.
+
+The `!` block docmd prints has three kinds of line, and only two are safe to paste:
+
+```
+! 2 of 3754 words did not survive conversion (99.9 % kept).      counts       — safe
+!   missing 'Here' near "the Discount List Click Here Click…"    YOUR TEXT    — do not paste
+!   one of them sits inside <txbxContent>.                        element name — safe
+```
+
+The element names are the actionable part. They are local names from the WordprocessingML
+namespace — a vocabulary Microsoft publishes, never anything a template author wrote — which is
+enforced by the namespace filter in `TextCoverageReport.CausesIn`. Treat that filter as
+load-bearing for privacy and not merely for noise; widening it to all namespaces would start
+emitting user-authored element names.
+
+So a good issue is one line:
+
+> docmd 0.1.0, 12 documents, 3 with losses, causes `drawing` and `sdt`.
+
+A construct we have never seen named in one of those reports is worth more to this project than
+any amount of code review, because it is the one thing we cannot obtain any other way.
+
+[`docs/report-flag-design.md`](docs/report-flag-design.md) designs a `--report` flag that emits
+that digest directly, with the content omitted by construction rather than by your editing. It
+is not built yet.
+
 ## Never name a real document
 
 docmd is developed against corpora of real business documents. Those documents are not in this
