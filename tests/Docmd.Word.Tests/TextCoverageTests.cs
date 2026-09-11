@@ -127,6 +127,38 @@ public sealed class TextCoverageTests : IDisposable
     }
 
     [Fact]
+    public void Measure_NeverNamesAnElementOutsideWordprocessingML()
+    {
+        // The privacy guarantee behind the reporting advice in README and CONTRIBUTING: we tell
+        // people the "sits inside <...>" lines are safe to paste in a public issue. That holds
+        // only because CausesIn filters ancestors to the WordprocessingML namespace, whose local
+        // names come from a schema Microsoft publishes and so are never user-authored.
+        //
+        // Widening that filter to learn about unrecognised wrappers is an obvious-looking
+        // improvement, and it would start emitting element names a customer's template author
+        // wrote -- on our own written advice that they are safe to share. A namespace URI is no
+        // better; it is usually a company domain. So the filter is load-bearing for privacy, not
+        // merely for noise, and this is the test that says so.
+        var coverage = TextCoverageReport.Measure(
+            Source("""
+                <w:p><w:r><w:pict><w:txbxContent>
+                  <acme:ContractValue xmlns:acme="https://acme.example/schema/pricing">
+                    <w:p><w:r><w:t>boxed</w:t></w:r></w:p>
+                  </acme:ContractValue>
+                </w:txbxContent></w:pict></w:r></w:p>
+                """),
+            "\n");
+
+        var named = coverage.Causes.Select(c => c.Construct).ToArray();
+
+        // Non-vacuous: cause derivation ran and did attribute the loss.
+        named.Should().Contain("txbxContent");
+
+        // ...and reported nothing the customer's template author named.
+        named.Should().NotContain("ContractValue");
+    }
+
+    [Fact]
     public void Measure_DoesNotBlameTheCompositesOwnWrappers()
         // docmd:package and docmd:body are ancestors of every node in the composite, so naming
         // them would attach a meaningless cause to every loss ever reported.
