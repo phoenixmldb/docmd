@@ -87,12 +87,48 @@ see in the `.docx` against the words a Markdown parser recovers from the output,
 that did not survive. Silent when nothing was lost.
 
 [`docs/limitations.md`](docs/limitations.md) is the canonical account — what the twelve words
-were, what causes each remaining loss, and where conversion cost stops being linear. Reproduce
-any of it against your own documents:
+were, what causes each remaining loss, and where conversion cost stops being linear.
+
+Those figures come from documents we are allowed to read. **CI does not reproduce them**, and
+cannot: the corpus is client work and is not in this repository. So the measurement is a dated
+claim about a fixed set of documents, not a promise about yours.
+
+## Telling us what it lost on your documents
+
+This is the most useful thing you can send us, and it needs no corpus and no clone.
+
+Convert your own files. If docmd prints nothing, it lost nothing. If it prints a `!` block,
+**two of those lines are safe to share and one is not**:
+
+```
+! 2 of 3754 words did not survive conversion (99.9 % kept).      <- safe: counts only
+!   missing 'Here' near "the Discount List Click Here Click…"    <- YOUR TEXT. do not paste
+!   one of them sits inside <txbxContent>.                        <- safe: an OOXML element name
+```
+
+The `sits inside <…>` lines are the ones we need. Those names come from the WordprocessingML
+schema Microsoft publishes — a closed public vocabulary, never anything your template author
+wrote — and they are the whole actionable fact. Knowing the construct was `txbxContent` is what
+leads to a fix; knowing the word was "Here" tells us nothing.
+
+So a complete, useful report is:
+
+> docmd 0.1.0, one document, 2 of 3754 words lost, `drawing` and `txbxContent`.
+
+Open that as an issue. You never have to show us the document, and please don't.
+
+A flag to emit exactly that digest — aggregated across a folder, with the content omitted by
+construction rather than by your editing — is designed in
+[`docs/report-flag-design.md`](docs/report-flag-design.md) and not yet built.
+
+**If you do have a corpus you can point at**, the batch audit reports across a whole folder:
 
 ```console
 $ DOCMD_CORPUS=/path/to/docx dotnet test tests/Docmd.Word.Tests --filter "FullyQualifiedName~Corpus_Audit"
 ```
+
+It reports rather than gates, and skips entirely when `DOCMD_CORPUS` is unset. See
+[CONTRIBUTING](CONTRIBUTING.md) for what makes a corpus worth auditing.
 
 ## Determinism
 

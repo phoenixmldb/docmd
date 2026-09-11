@@ -1,7 +1,8 @@
 # Chained predicates in a match pattern make the transform quadratic
 
 **Filed:** [phoenixmldb-xslt#10](https://github.com/phoenixmldb/phoenixmldb-xslt/issues/10) on 2026-09-10.
-**Re-verified on 1.6.15** that day: still reproduces, behaviour unchanged from 1.6.13.
+**Re-verified on 1.6.15** that day, and on **1.7.0** on 2026-09-11: still reproduces,
+behaviour unchanged from 1.6.13.
 This file is the working detail; the issue is the report. Update both.
 
 **Engine:** `PhoenixmlDb.Xslt` 1.6.13
