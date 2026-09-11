@@ -9,6 +9,27 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-09-11
+
+Documentation only. No behaviour change: the conversion, the CLI surface and the output are
+byte-for-byte those of 0.1.0.
+
+### Fixed
+
+- Two coverage figures in the shipped XML documentation contradicted every published number.
+  `TextCoverageReport` described "38 documents losing nothing and about 3% of all text" — the
+  measurement taken before widening the whitelist, which understated the tool by roughly 300x
+  against the actual 43 of 49 and twelve words. It reached the generated API documentation, so
+  correcting it is the reason this release exists.
+
+### Changed
+
+- The same remark no longer claims one document is "pathological" for keeping 92% of its
+  content in text boxes. docmd reads text boxes correctly; that was one of the constructs the
+  coverage measurement led us to fix.
+- It now states that CI does not reproduce the coverage figures, because the corpus is not in
+  this repository — a dated measurement, not a gate.
+
 ## [0.1.0] — 2026-09-10
 
 First release. Converts `.docx`, `.docm`, `.dotx` and `.dotm` to Markdown.
