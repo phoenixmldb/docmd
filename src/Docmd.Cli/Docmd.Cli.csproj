@@ -7,11 +7,20 @@
     <ToolCommandName>docmd</ToolCommandName>
     <PackageId>Docmd.Cli</PackageId>
     <Description>Converts Microsoft Word documents to Markdown for AI/RAG indexing and human reading.</Description>
+    <!-- A package-specific readme rather than the repository's. nuget.org renders no relative
+         link, so README.md's links into docs/ would all be dead on the gallery page, and the
+         audience there is deciding whether to install rather than how to contribute. -->
+    <PackageReadmeFile>PACKAGE.md</PackageReadmeFile>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/phoenixmldb/docmd</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/phoenixmldb/docmd</RepositoryUrl>
+    <PackageTags>word;docx;markdown;converter;ooxml;rag;xslt</PackageTags>
     <!-- CA1303: literal strings in console output are the product's UI, not
          localisable resources. -->
     <NoWarn>$(NoWarn);CA1303</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Docmd.Word/Docmd.Word.csproj" />
+    <None Include="PACKAGE.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>
