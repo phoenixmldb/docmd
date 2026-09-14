@@ -9,6 +9,21 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A crash converting tables whose cells span columns.** `PhoenixmlDb.Xslt` 1.6.15 threw an
+  unhandled `InvalidCastException` when an `xsl:for-each` ranged over a value cast from an
+  attribute — `2 to xs:integer((@gs, 1)[1])`, which is how docmd pads a row from `w:gridSpan`.
+  It killed the whole transform rather than degrading, so an affected document did not convert
+  at all. Fixed in the engine at 1.8.0; the pin moves with it.
+
+### Changed
+
+- `PhoenixmlDb.Xslt` 1.6.15 → 1.8.0 (which brings `PhoenixmlDb.XQuery` 1.8.0). Verified against
+  the version it replaces: 350 tests pass, the performance gate passes, engine timings are
+  indistinguishable at every document size once warm-up is controlled, and a real document
+  converts byte-identically to what 0.1.2 produces.
+
 ## [0.1.2] — 2026-09-11
 
 Packaging only. No behaviour change.
