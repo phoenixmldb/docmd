@@ -236,3 +236,26 @@ report the degradation rather than swallow it.
 
 **What the audit must count:** `w:ilvl/@w:val` values that do not cast to `xs:integer`, and
 the documents they appear in.
+
+## Characters dropped inside a word: `w:noBreakHyphen` and `w:sym`
+
+**Status: known defect, not a deliberate omission.** Recorded here because the coverage check
+does not report it and a reader would otherwise have no way to know.
+
+`<w:noBreakHyphen/>` and `<w:sym/>` carry visible characters without being `w:t`, and the
+stylesheet's inline whitelist does not name them, so their characters are dropped:
+
+```
+source:  Sec. 15-8.3.
+docmd:   Sec. 158.3.
+```
+
+On a corpus of municipal codes those two elements occur 9,371 and 2,807 times respectively.
+
+**Why coverage stays silent.** The check compares words. `15-8.3` becoming `158.3` is one word in
+and one word out, so nothing is reported missing. The oracle detects a word that disappeared, not
+a character that disappeared from inside a word — and a mangled section number is worse than a
+missing one, because it looks correct.
+
+That is a real gap in the measurement, not only in the transform, and closing it means comparing
+at a finer grain than words for the cases where a word survives but changes.

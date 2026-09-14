@@ -8,8 +8,12 @@ $ dotnet tool install -g Docmd.Cli
 $ docmd report.docx -o out/
 ```
 
-Accepts `.docx`, `.docm`, `.dotx` and `.dotm`. Word 97-2003 `.doc` is a different, binary format —
-re-save it as `.docx` first.
+Accepts `.docx`, `.docm`, `.dotx` and `.dotm`. Word 97-2003 `.doc` is a different, binary format,
+and docmd refuses it rather than guessing. Convert those first:
+
+```console
+$ soffice --headless --convert-to docx --outdir ./converted ./*.doc
+```
 
 ## It tells you what it could not read
 
