@@ -131,7 +131,7 @@ When documents have moved, been renamed, or been reorganised, rebuild by content
 
 ```console
 $ scripts/verify-corpus.sh /tmp/corpus --rebuild ~/Dropbox
-  recovered  contract-2019.docx
+  recovered  <the document, under the name the manifest recorded>
 recovered 1 of 1
 ```
 
