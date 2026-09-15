@@ -453,7 +453,7 @@
   <xsl:template match="w:r" mode="inline">
     <xsl:variable name="text" select="string-join(w:t, '')"/>
 
-    <xsl:if test="$text ne '' or w:br or w:tab or w:drawing">
+    <xsl:if test="$text ne '' or w:br or w:tab or w:noBreakHyphen or w:drawing">
       <!--
         BRIEF DEFECT (flagged, not silently resolved: see task-7-report.md). The plan's
         given template built this sequence as "all w:t joined, then all w:br appended",
@@ -468,7 +468,7 @@
         Folding w:drawing into the same document-order union keeps it in true position.
       -->
       <xsl:variable name="innermost" as="node()*">
-        <xsl:for-each select="w:t | w:br | w:tab | w:drawing">
+        <xsl:for-each select="w:t | w:br | w:tab | w:noBreakHyphen | w:drawing">
           <xsl:choose>
             <xsl:when test="self::w:t"><md:text><xsl:value-of select="."/></md:text></xsl:when>
             <xsl:when test="self::w:br"><md:br/></xsl:when>
@@ -479,6 +479,17 @@
               written directly in a stylesheet is stripped from it before it ever runs.
             -->
             <xsl:when test="self::w:tab"><md:text><xsl:text> </xsl:text></md:text></xsl:when>
+            <!--
+              A non-breaking hyphen is a hyphen; the non-breaking part is a line-layout
+              instruction and Markdown has no line layout, so it is dropped the same way a
+              font is. Emitting U+2011 instead would be more literal and less useful: a
+              reader searching "15-8.3" would not match "15{U+2011}8.3".
+
+              Not decoration. It carries the hyphen in section numbers like "Sec. 15-8.3",
+              and dropping it silently produced "Sec. 158.3" - a citation that is wrong and
+              looks right.
+            -->
+            <xsl:when test="self::w:noBreakHyphen"><md:text>-</md:text></xsl:when>
             <xsl:otherwise><xsl:apply-templates select="." mode="inline"/></xsl:otherwise>
           </xsl:choose>
         </xsl:for-each>
@@ -583,8 +594,11 @@
   <xsl:function name="docmd:visible-text" as="xs:string">
     <xsl:param name="node" as="node()"/>
     <xsl:sequence select="string-join(
-        for $n in $node//*[self::w:t or self::w:tab or self::w:br][not(ancestor::w:del)]
-        return if ($n/self::w:t) then string($n) else ' ',
+        for $n in $node//*[self::w:t or self::w:tab or self::w:br or self::w:noBreakHyphen]
+                          [not(ancestor::w:del)]
+        return if ($n/self::w:t) then string($n)
+               else if ($n/self::w:noBreakHyphen) then '-'
+               else ' ',
         '')"/>
   </xsl:function>
 

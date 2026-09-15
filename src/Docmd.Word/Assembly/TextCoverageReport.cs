@@ -105,6 +105,14 @@ public static class TextCoverageReport
     }
 
     /// <summary>The words a reader sees in the source document, in document order.</summary>
+    /// <remarks>
+    /// This must stay strictly MORE inclusive than the stylesheet. Where the two read the same
+    /// set of elements they agree about anything neither reads, and comparing them can no
+    /// longer detect a dropped character: w:noBreakHyphen went unreported 9,371 times in one
+    /// corpus for exactly that reason, turning "Sec. 15-8.3" into "Sec. 158.3" while coverage
+    /// reported the document intact. An element read here and not there is reported as a loss,
+    /// which is the correct direction for the error to point.
+    /// </remarks>
     public static IReadOnlyList<string> SourceWords(XDocument composite)
     {
         ArgumentNullException.ThrowIfNull(composite);
@@ -145,9 +153,27 @@ public static class TextCoverageReport
             {
                 text.Append(node.Value);
             }
-            else if (node.Name == Word + "tab" || node.Name == Word + "br")
+            else if (node.Name == Word + "noBreakHyphen"
+                     && !node.Ancestors(Word + "del").Any()
+                     && !node.Ancestors(Compatibility + "Fallback").Any())
             {
-                text.Append(' ');
+                // Matches the stylesheet, which emits a plain hyphen for this.
+                text.Append('-');
+            }
+            else if (node.Name == Word + "sym"
+                     && !node.Ancestors(Word + "del").Any()
+                     && !node.Ancestors(Compatibility + "Fallback").Any())
+            {
+                // A symbol-font character. w:char is a code point in the font's own
+                // encoding, not Unicode, so for a legacy font like "WP TypographicSymbols"
+                // there is no honest mapping to emit and the transform drops it.
+                //
+                // Counting it here anyway is the point. This oracle has to be strictly MORE
+                // inclusive than the transform, or the two agree by construction about every
+                // element neither of them reads, and a dropped character cannot be detected
+                // by comparing them. U+FFFD cannot appear in the Markdown, so the word
+                // holding it is reported lost - which is true, and was previously silent.
+                text.Append('\uFFFD');
             }
         }
 

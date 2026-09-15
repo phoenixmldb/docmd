@@ -11,6 +11,28 @@ stylesheet writes against is not stable until `1.0`.
 
 ### Fixed
 
+- **A non-breaking hyphen is no longer dropped, so section numbers are right.**
+  `<w:noBreakHyphen/>` carries the hyphen in citations like `Sec. 15-8.3`; docmd read only
+  `w:t` and produced `Sec. 158.3` — a citation that is wrong and looks right. 9,371 occurrences
+  in one corpus of municipal codes. **This changes conversion output** for any document
+  containing one.
+
+### Changed
+
+- **The coverage check now counts `w:noBreakHyphen` and `w:sym`**, and will report losses it
+  previously could not see. The oracle had read exactly the three elements the stylesheet read,
+  so the two agreed about everything neither could see and the dropped hyphen was undetectable
+  by comparing them. The rule now recorded in the code: the oracle must stay strictly more
+  inclusive than the transform.
+
+  `w:sym` is still not emitted — its `w:char` is a code point in the font's own encoding, so for
+  a legacy font there is no honest mapping and guessing would invent content — but it is now
+  reported rather than dropped silently.
+
+  Consequence: **published coverage figures are a lower bound until re-measured.** A document
+  containing `w:sym` will report words it did not report before. The conversion did not get
+  worse; the reporting got louder.
+
 - **A crash converting tables whose cells span columns.** `PhoenixmlDb.Xslt` 1.6.15 threw an
   unhandled `InvalidCastException` when an `xsl:for-each` ranged over a value cast from an
   attribute — `2 to xs:integer((@gs, 1)[1])`, which is how docmd pads a row from `w:gridSpan`.
