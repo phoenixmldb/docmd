@@ -82,6 +82,11 @@ deployment runbooks — measured 2026-09-10 on docmd 0.1.0.
 | 1,000-paragraph document | ~20 s |
 | 11,000-paragraph document | ~5 min |
 
+**Pending re-measurement.** The coverage oracle has since been made stricter — it now counts
+`w:noBreakHyphen` and `w:sym`, which it previously could not see — so the table above is a
+lower bound on reported loss until the audit is re-run. The conversion did not get worse; the
+reporting got louder.
+
 docmd checks this on every conversion, not just under test: it compares the words a reader can
 see in the `.docx` against the words a Markdown parser recovers from the output, and reports any
 that did not survive. Silent when nothing was lost.

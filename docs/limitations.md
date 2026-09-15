@@ -15,6 +15,14 @@ that did not survive. On the 49-document sample it was built against:
 | Words lost, all documents | **12** — under 0.01% of the corpus |
 | Worst document | 3 words |
 
+> **These figures predate a change to the measurement and have not been re-run.** The coverage
+> oracle now counts `w:noBreakHyphen` and `w:sym`, which it previously could not see, so it is
+> strictly stricter than the one that produced the table above. A document in that sample
+> containing `w:sym` will now report words it did not report before. The numbers are therefore
+> a lower bound on reported loss, not a current measurement, until the audit is re-run against
+> the same corpus. Nothing about the conversion got worse — the hyphen case got better — but the
+> reporting did get louder, which is the point of it.
+
 The residual twelve are single words in six documents, and each is a tokenisation edge rather
 than a construct docmd cannot read: a path with backslashes, a SQL identifier carrying commas
 and parentheses, an ellipsis-truncated URL. They are recorded because the check reports them,
@@ -237,25 +245,34 @@ report the degradation rather than swallow it.
 **What the audit must count:** `w:ilvl/@w:val` values that do not cast to `xs:integer`, and
 the documents they appear in.
 
-## Characters dropped inside a word: `w:noBreakHyphen` and `w:sym`
+## Characters dropped inside a word: `w:sym`
 
-**Status: known defect, not a deliberate omission.** Recorded here because the coverage check
-does not report it and a reader would otherwise have no way to know.
+`<w:sym/>` carries a visible character without being `w:t`. Its `w:char` is a code point in the
+**font's own encoding**, not Unicode, so for a legacy font such as `WP TypographicSymbols` there
+is no honest mapping from the file to a character. docmd drops it rather than guess: emitting a
+plausible-looking wrong character is worse than emitting none, because nothing downstream can
+tell.
 
-`<w:noBreakHyphen/>` and `<w:sym/>` carry visible characters without being `w:t`, and the
-stylesheet's inline whitelist does not name them, so their characters are dropped:
+**It is reported.** The coverage check counts these, so a document containing them reports the
+affected words as lost and names `sym` as the cause. That is the intended behaviour for a
+construct we cannot read: omit, and say so.
 
-```
-source:  Sec. 15-8.3.
-docmd:   Sec. 158.3.
-```
+On a corpus of municipal codes `w:sym` occurs 2,807 times, mostly section symbols and dashes in
+tables of contents.
 
-On a corpus of municipal codes those two elements occur 9,371 and 2,807 times respectively.
+### Fixed in an earlier release: `w:noBreakHyphen`
 
-**Why coverage stays silent.** The check compares words. `15-8.3` becoming `158.3` is one word in
-and one word out, so nothing is reported missing. The oracle detects a word that disappeared, not
-a character that disappeared from inside a word — and a mangled section number is worse than a
-missing one, because it looks correct.
+Kept here because the *reason* it went unnoticed matters more than the bug.
 
-That is a real gap in the measurement, not only in the transform, and closing it means comparing
-at a finer grain than words for the cases where a word survives but changes.
+`<w:noBreakHyphen/>` is the hyphen in a section number like `Sec. 15-8.3`. docmd dropped it,
+producing `Sec. 158.3` — a citation that is wrong and looks right. 9,371 occurrences in one
+corpus, and **every affected document reported clean coverage**.
+
+The silence was structural, not an oversight. The coverage oracle read `w:t`, `w:tab` and `w:br`;
+the stylesheet read the same three. Two readers with the same blind spot agree about everything
+neither can see, so comparing them could not detect the loss. Word-level comparison made it
+worse: `15-8.3` becoming `158.3` is one word in and one word out, so even the tokens matched.
+
+The rule that came out of it: **the oracle must be strictly more inclusive than the transform.**
+An element counted by the oracle and not emitted by the stylesheet reports a loss, which is the
+correct direction for the error to point. `w:sym` above is that rule working.

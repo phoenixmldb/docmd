@@ -127,6 +127,35 @@ public sealed class TextCoverageTests : IDisposable
     }
 
     [Fact]
+    public void Measure_CountsANonBreakingHyphenAsPartOfTheWord()
+        // "Sec. 15-8.3" is a w:noBreakHyphen between two runs, not a hyphen character. While
+        // this oracle read only w:t it agreed with a stylesheet that also read only w:t, so
+        // the dropped hyphen was undetectable by comparing them: source and output both said
+        // "158.3". 9,371 occurrences in one corpus, every document reported intact.
+        => TextCoverageReport.Measure(
+                Source("""<w:p><w:r><w:t>Sec. 15</w:t><w:noBreakHyphen/><w:t>8.3</w:t></w:r></w:p>"""),
+                "Sec. 158.3\n")
+            .LostWords.Should().ContainSingle().Which.Word.Should().Be("15-8.3");
+
+    [Fact]
+    public void Measure_AcceptsTheHyphenWhenTheOutputCarriesIt()
+        => TextCoverageReport.Measure(
+                Source("""<w:p><w:r><w:t>Sec. 15</w:t><w:noBreakHyphen/><w:t>8.3</w:t></w:r></w:p>"""),
+                "Sec. 15-8.3\n")
+            .IsComplete.Should().BeTrue();
+
+    [Fact]
+    public void Measure_ReportsASymbolCharacterTheTransformCannotEmit()
+        // w:char is a code point in the font's own encoding, so for a legacy symbol font there
+        // is no honest mapping and the stylesheet drops it. The oracle still counts it: an
+        // element read here and not there reports a loss, which is the correct direction. The
+        // alternative is what we had - silence about 2,807 dropped characters.
+        => TextCoverageReport.Measure(
+                Source("""<w:p><w:r><w:t>alpha</w:t><w:sym w:font="Symbol" w:char="F0B7"/><w:t>beta</w:t></w:r></w:p>"""),
+                "alphabeta\n")
+            .IsComplete.Should().BeFalse();
+
+    [Fact]
     public void Measure_NeverNamesAnElementOutsideWordprocessingML()
     {
         // The privacy guarantee behind the reporting advice in README and CONTRIBUTING: we tell
