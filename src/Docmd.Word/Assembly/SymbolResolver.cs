@@ -67,7 +67,14 @@ public static class SymbolResolver
     /// ([0041]DROP[0040])                    ("DROP")                 -> 0041/0040 are quotes
     /// ARTICLE X [0042] PENSION PLAN         ARTICLE X - PENSION PLAN -> 0042 is a dash
     /// three and one-half ([0032]) inches    three and one-half (3.5) -> 0032 is one half
+    /// The suffixes [003E]boulevard[003D]     a quoted word            -> 003E pairs with 003D
     /// </code>
+    /// <para>
+    /// That last one is how this table is meant to grow. The character was unresolved, so the
+    /// coverage check reported the word holding it as lost and printed its surroundings, and the
+    /// surroundings said what it was. A symbol nobody has identified names itself the first time
+    /// it costs someone a word.
+    /// </para>
     /// <para>
     /// Entries stop where the evidence stops. Twenty-one further occurrences across
     /// "WP MathExtendedA", "WP Phonetic" and three more slots in this set are left unresolved,
@@ -91,6 +98,7 @@ public static class SymbolResolver
         [0x42] = "—",   // em dash, used as an aside separator
         [0x43] = "–",   // en dash, used between the ends of a range
         [0x3D] = "’",   // right single quotation mark, used as an apostrophe
+        [0x3E] = "‘",   // left single quotation mark, the pair of 0x3D
         [0x32] = "½",   // one half
     };
 

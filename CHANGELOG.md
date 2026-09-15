@@ -20,6 +20,16 @@ stylesheet writes against is not stable until `1.0`.
   and the table path did not emit them, so the mismatch was reported rather than silent. Under
   0.1.2's oracle it would have gone unnoticed exactly as the original hyphen bug did.
 
+- **One more symbol resolved: the left single quotation mark.** It was unresolved, so the
+  coverage check reported the word holding it and printed the surroundings, and the surroundings
+  said what it was — `The suffixes [003E]boulevard'`, the pair of a mapping already in the table.
+  A character nobody has identified naming itself the first time it costs someone a word is what
+  the reporting is for.
+
+  With both fixes, a 76,154-word municipal code dense with tables, symbols and non-breaking
+  hyphens converts with **nothing lost**. The same document reported clean this morning while
+  silently dropping thousands of characters.
+
 ## [0.2.0] — 2026-09-15
 
 A minor bump because **conversion output changes**: characters that were silently dropped now
