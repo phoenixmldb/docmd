@@ -9,6 +9,35 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-09-15
+
+Packaging and dependencies. **No behaviour change**: conversion output is byte-identical to
+0.2.1, verified across 52 documents.
+
+### Added
+
+- **A package icon**, embedded via `PackageIcon` rather than the deprecated `PackageIconUrl`,
+  which renders as a broken image once whatever it points at moves.
+
+### Changed
+
+- **The package's project website is the documentation**, not the repository. nuget.org renders
+  `PackageProjectUrl` as "Project website" and `RepositoryUrl` as "Source repository", and both
+  were the same GitHub URL — so the gallery offered one destination twice and no route to the
+  docs at all. Project website is now `phoenixml.dev/tools/docmd`; the repository link is
+  unchanged.
+- **`PhoenixmlDb.Xslt` 1.8.0 → 2.0.0** (bringing Core and XQuery 2.0.0).
+
+  A major version that fixes none of the defects docmd has open against the engine — its
+  breaking change is extension functions moving from `ft:`/`dbxml:` to `phx:`, which docmd does
+  not use, since its `docmd:` functions are declared in its own stylesheet. Taken for currency
+  rather than benefit, and verified by holding the code still and moving only the pin: 355 tests
+  pass, the performance gate passes, and 52 of 52 documents convert byte-identically to 1.8.0.
+
+  It was kept out of 0.2.1 deliberately. That was a correctness release, and mixing a dependency
+  move into a behaviour change leaves a later bisect unable to tell which caused what. Here both
+  changes are behaviour-neutral, so there is nothing to confuse them with.
+
 ## [0.2.1] — 2026-09-15
 
 A correctness fix to the feature 0.2.0 was released for. 0.2.0 taught ordinary text to read
