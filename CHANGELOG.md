@@ -9,6 +9,11 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-09-15
+
+A correctness fix to the feature 0.2.0 was released for. 0.2.0 taught ordinary text to read
+`w:noBreakHyphen` and `w:sym`; table cells have their own text extraction and were missed.
+
 ### Fixed
 
 - **A table cell no longer drops non-breaking hyphens and symbols.** 0.2.0 fixed this for
