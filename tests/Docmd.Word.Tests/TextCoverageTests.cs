@@ -127,6 +127,18 @@ public sealed class TextCoverageTests : IDisposable
     }
 
     [Fact]
+    public void Measure_TreatsATabInsideARunAsAWordSeparator()
+        // Word puts the tab inside the following run: <w:tab/><w:t>In General</w:t>. Counting it
+        // as nothing welds it onto the previous run, the source reads "I.In General", and the
+        // correctly-spaced Markdown is then reported as having lost a word that never existed.
+        // 382 phantom losses on one document when this branch was accidentally dropped, and
+        // nothing in the suite noticed.
+        => TextCoverageReport.Measure(
+                Source("""<w:p><w:r><w:t>Art. I.</w:t></w:r><w:r><w:tab/><w:t>In General</w:t></w:r></w:p>"""),
+                "Art. I. In General\n")
+            .IsComplete.Should().BeTrue();
+
+    [Fact]
     public void Measure_CountsANonBreakingHyphenAsPartOfTheWord()
         // "Sec. 15-8.3" is a w:noBreakHyphen between two runs, not a hyphen character. While
         // this oracle read only w:t it agreed with a stylesheet that also read only w:t, so

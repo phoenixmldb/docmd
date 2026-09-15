@@ -164,16 +164,25 @@ public static class TextCoverageReport
                      && !node.Ancestors(Word + "del").Any()
                      && !node.Ancestors(Compatibility + "Fallback").Any())
             {
-                // A symbol-font character. w:char is a code point in the font's own
-                // encoding, not Unicode, so for a legacy font like "WP TypographicSymbols"
-                // there is no honest mapping to emit and the transform drops it.
+                // Reads the character SymbolResolver worked out, so this and the stylesheet
+                // cannot disagree about what the document says: they consume one annotation
+                // rather than each deciding independently. That independence is exactly what
+                // hid the dropped hyphen.
                 //
-                // Counting it here anyway is the point. This oracle has to be strictly MORE
-                // inclusive than the transform, or the two agree by construction about every
-                // element neither of them reads, and a dropped character cannot be detected
-                // by comparing them. U+FFFD cannot appear in the Markdown, so the word
-                // holding it is reported lost - which is true, and was previously silent.
-                text.Append('\uFFFD');
+                // No docmd:char means the font is not one we can resolve. U+FFFD then stands
+                // in, and because it cannot appear in the Markdown the word holding it is
+                // reported lost - which is true, and is the behaviour we want for a character
+                // we decline to guess at.
+                var resolved = (string?)node.Attribute(WordNames.Docmd + "char");
+                text.Append(string.IsNullOrEmpty(resolved) ? "\uFFFD" : resolved);
+            }
+            else if (node.Name == Word + "tab" || node.Name == Word + "br")
+            {
+                // A tab separates words. Without this, a run holding <w:tab/><w:t>In General</w:t>
+                // welds onto the previous run's text and the source reads "I.In General", which
+                // the correctly-spaced Markdown then fails to contain: 382 phantom losses on one
+                // document. The stylesheet emits a space here too, and the two must agree.
+                text.Append(' ');
             }
         }
 

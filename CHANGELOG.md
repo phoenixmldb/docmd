@@ -25,9 +25,13 @@ stylesheet writes against is not stable until `1.0`.
   by comparing them. The rule now recorded in the code: the oracle must stay strictly more
   inclusive than the transform.
 
-  `w:sym` is still not emitted — its `w:char` is a code point in the font's own encoding, so for
-  a legacy font there is no honest mapping and guessing would invent content — but it is now
-  reported rather than dropped silently.
+  **`w:sym` is now resolved too.** `SymbolResolver` maps the font's own encoding to a character
+  and stamps it on the composite, so the stylesheet and the coverage check read one answer
+  instead of each deciding for itself — the independence between those two is exactly what hid
+  the hyphen. Covers Adobe's published `Symbol` encoding, and the `WP TypographicSymbols` set a
+  WordPerfect-to-Word conversion emits, which turns out to carry section signs, curly quotes,
+  dashes and fractions. A font or code point not in the table is still dropped and reported
+  rather than guessed at.
 
   Consequence: **published coverage figures are a lower bound until re-measured.** A document
   containing `w:sym` will report words it did not report before. The conversion did not get
