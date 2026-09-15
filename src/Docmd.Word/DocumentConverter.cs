@@ -29,6 +29,10 @@ public static class DocumentConverter
         // 3: annotate.
         HeadingAnnotator.Annotate(composite);
 
+        // Resolves w:sym to a character and stamps it, so the stylesheet and the coverage
+        // check read one answer instead of each deciding for itself.
+        SymbolResolver.Annotate(composite);
+
         // 4: transform. The transform-and-parse join lives in one place (MarkdownTransform)
         // because it is itself a place data can be lost -- see that type's remarks.
         var mdXml = await MarkdownTransform.RunAsync(composite, options.StylesheetPath, ct).ConfigureAwait(false);
