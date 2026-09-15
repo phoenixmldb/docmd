@@ -9,6 +9,11 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-15
+
+A minor bump because **conversion output changes**: characters that were silently dropped now
+appear. Nothing was removed, and no option changed.
+
 ### Fixed
 
 - **A non-breaking hyphen is no longer dropped, so section numbers are right.**
@@ -49,6 +54,18 @@ stylesheet writes against is not stable until `1.0`.
   the version it replaces: 350 tests pass, the performance gate passes, engine timings are
   indistinguishable at every document size once warm-up is controlled, and a real document
   converts byte-identically to what 0.1.2 produces.
+
+### Measurement
+
+Coverage figures are now quoted against a **corpus id** — a content hash of the documents they
+were measured on — so a later run can prove it measured the same documents. The previous record
+was a list of filenames, and when the oracle changed this week, 20 of its 21 names no longer
+resolved to a file. `scripts/verify-corpus.sh` produces the id, verifies a corpus is intact, and
+rebuilds one by content when documents have moved or been renamed.
+
+Measured on docmd 0.2.0 against corpus `dca5084324a9022c`: 50 of 50 convert, 27 lose not one
+word, 134 words lost of ~51,800. **Not comparable to 0.1.0's figures** — both the documents and
+the measurement changed.
 
 ## [0.1.2] — 2026-09-11
 

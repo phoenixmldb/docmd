@@ -6,35 +6,24 @@ so the decision to leave it can be revisited with numbers instead of guesses.
 
 **Measured, not estimated.** docmd checks every conversion: it compares the words a reader can
 see in the `.docx` against the words a Markdown parser recovers from the output, and reports any
-that did not survive. On the 49-document sample it was built against:
+that did not survive. Measured 2026-09-14 on docmd 0.2.0, against corpus `dca5084324a9022c`:
 
 | | |
 |---|---|
-| Documents converted | 49 of 49, none failed |
-| Documents losing not one word | **43** |
-| Words lost, all documents | **12** — under 0.01% of the corpus |
-| Worst document | 3 words |
+| Documents converted | 50 of 50, none failed |
+| Documents losing not one word | **27** |
+| Words lost, all documents | **134** of ~51,800 — 0.26% |
+| Worst document | 61 words (97.3% kept) |
 
-> **These figures predate a change to the measurement and have not been re-run.** The coverage
-> oracle now counts `w:noBreakHyphen` and `w:sym`, which it previously could not see, so it is
-> strictly stricter than the one that produced the table above. A document in that sample
-> containing `w:sym` will now report words it did not report before. The numbers are therefore
-> a lower bound on reported loss, not a current measurement, until the audit is re-run against
-> the same corpus. Nothing about the conversion got worse — the hyphen case got better — but the
-> reporting did get louder, which is the point of it.
+The corpus id is a content hash produced by `scripts/verify-corpus.sh`, and it is quoted here so
+the figure can be re-run against the same documents. It could not be, last time: the previous
+record was a list of filenames, and when the measurement changed, 20 of its 21 names no longer
+resolved to a file.
 
-The residual twelve are single words in six documents, and each is a tokenisation edge rather
-than a construct docmd cannot read: a path with backslashes, a SQL identifier carrying commas
-and parentheses, an ellipsis-truncated URL. They are recorded because the check reports them,
-not because a reader would notice.
-
-The entries below are what accounts for the rest.
-
-An earlier revision of this file reported 3.15% loss and a document losing 92.5% of itself. Those
-figures were wrong. They came from a sequence-alignment check that mis-paired a repeated common
-word, advanced past everything between, and reported the remainder as missing; on one document it
-turned a real loss of 8 words into a claim of 3,307. The measurement now counts occurrences
-instead, which cannot cascade.
+**Not comparable to the 0.1.0 figures** (43 of 49, 12 words). Both the documents and the
+measurement changed. The oracle now counts `w:noBreakHyphen` and `w:sym`, which it previously
+could not see, so it reports losses the old one was structurally unable to detect — see the
+`w:sym` section below for what that blindness cost.
 
 ## Text inside transparent wrappers is dropped
 

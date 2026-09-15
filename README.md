@@ -69,23 +69,29 @@ a paragraph.
 
 ## Measured behaviour
 
-Numbers here are a dated measurement against a fixed corpus, not a running total: 49 real
-business documents spanning 2008 to 2024 — statements of work, invoices, program guides,
-deployment runbooks — measured 2026-09-10 on docmd 0.1.0.
+A dated measurement against a **named** corpus, not a running total: 50 real business documents,
+measured 2026-09-14 on docmd 0.2.0 against corpus `dca5084324a9022c`.
 
 | | |
 |---|---|
-| Converted without error | **49 of 49** |
-| Lost not one word | **43** |
-| Total words lost | **12** — under 0.01% of the corpus |
-| Worst single document | 3 words |
+| Converted without error | **50 of 50** |
+| Lost not one word | **27** |
+| Total words lost | **134** of ~51,800 — 0.26% |
+| Worst single document | 61 words (97.3% kept) |
 | 1,000-paragraph document | ~20 s |
 | 11,000-paragraph document | ~5 min |
 
-**Pending re-measurement.** The coverage oracle has since been made stricter — it now counts
-`w:noBreakHyphen` and `w:sym`, which it previously could not see — so the table above is a
-lower bound on reported loss until the audit is re-run. The conversion did not get worse; the
-reporting got louder.
+That corpus id is a hash of the documents' content, produced by
+[`scripts/verify-corpus.sh`](scripts/verify-corpus.sh). Quoting it is the point: a later run can
+prove it measured the same documents rather than merely the same number of them. The previous
+record of a corpus was a list of filenames, and by the time these figures needed re-running,
+20 of its 21 names no longer resolved to a file.
+
+**These numbers are not comparable to 0.1.0's** (`43 of 49`, 12 words). Both the documents and
+the measurement changed, so the difference between them measures nothing. The oracle now counts
+`w:noBreakHyphen` and `w:sym`, which it previously could not see — so it reports losses the old
+one was structurally unable to detect. The conversion got better in 0.2.0; the reporting got
+honest.
 
 docmd checks this on every conversion, not just under test: it compares the words a reader can
 see in the `.docx` against the words a Markdown parser recovers from the output, and reports any
