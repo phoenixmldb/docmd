@@ -83,7 +83,10 @@ never moved.
 
 ## Links
 
-- **Source and full documentation:** https://github.com/phoenixmldb/docmd
+- **Documentation:** https://phoenixml.dev/tools/docmd
+- **How it was built, and what a stylesheet gets wrong:**
+  https://phoenixml.dev/notes/introducing-docmd
+- **Source:** https://github.com/phoenixmldb/docmd
 - **What it knowingly drops, and the measured figures:**
   https://github.com/phoenixmldb/docmd/blob/main/docs/limitations.md
 - **Found a document it handles badly?**
