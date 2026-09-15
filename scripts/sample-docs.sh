@@ -91,7 +91,12 @@ fi
 
 mkdir -p "$DEST" || die "cannot write to $DEST"
 MANIFEST="$DEST/_source.tsv"
-printf 'copied\toriginal\n' > "$MANIFEST"
+# sha256 first, because content is the only durable identity a document has. Names get
+# changed, folders get reorganised, and a manifest of paths then points at nothing: this
+# repo's earlier name-based record went from 21 entries to 1 that still resolved. A hash
+# survives all of that, and lets scripts/verify-corpus.sh prove a figure was measured
+# against these documents and not merely against this many documents.
+printf 'sha256\tcopied\toriginal\n' > "$MANIFEST"
 
 copied=0 renamed=0 bytes=0
 for path in "${picked[@]}"; do
@@ -112,7 +117,7 @@ for path in "${picked[@]}"; do
     copied=$((copied + 1))
     size=$(wc -c < "$target" 2>/dev/null || printf 0)
     bytes=$((bytes + size))
-    printf '%s\t%s\n' "$(basename "$target")" "$path" >> "$MANIFEST"
+    printf '%s\t%s\t%s\n' "$(sha256sum -- "$target" | cut -d' ' -f1)" "$(basename "$target")" "$path" >> "$MANIFEST"
   else
     printf '  could not copy: %s\n' "$path" >&2
   fi
@@ -121,4 +126,5 @@ done
 printf 'Copied %s document(s) to %s (%s)\n' "$copied" "$DEST" "$(numfmt --to=iec "$bytes" 2>/dev/null || printf '%s bytes' "$bytes")"
 [ "$renamed" -gt 0 ] && printf '  %s renamed to avoid overwriting a same-named document\n' "$renamed"
 printf '  traceability: %s maps each copy back to its original path\n' "$MANIFEST"
-printf '\nNext:\n  scripts/convert-tree.sh %s %s-out\n' "$DEST" "$DEST"
+printf '\nNext:\n  scripts/verify-corpus.sh %s      # confirm it is intact before measuring\n' "$DEST"
+printf '  scripts/convert-tree.sh %s %s-out\n' "$DEST" "$DEST"
