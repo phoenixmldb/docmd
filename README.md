@@ -146,8 +146,29 @@ $ dotnet tool install -g Docmd.Cli
 $ docmd --help
 ```
 
-Requires .NET 10. Accepts `.docx`, `.docm`, `.dotx` and `.dotm`. Word 97–2003 `.doc` is a different,
-binary format — re-save it first (`soffice --convert-to docx legacy.doc`).
+Requires .NET 10. Accepts `.docx`, `.docm`, `.dotx` and `.dotm`.
+
+### Converting legacy `.doc` files
+
+Word 97–2003 `.doc` is not a variant of `.docx` — it is a different, binary format (an OLE2
+compound file), sharing no parser with OOXML. docmd refuses it rather than guessing, exiting `2`
+with a message saying so.
+
+Convert first, with LibreOffice:
+
+```console
+$ soffice --headless --convert-to docx --outdir ./converted ./*.doc
+$ docmd ./converted/report.docx -o out/
+```
+
+This is a well-trodden route rather than a theoretical one: on a corpus of 106 municipal `.doc`
+files spanning the 1980s to the 2010s, every one converted, and the results then passed docmd's
+coverage audit with no document losing text and none throwing.
+
+Two practical notes. Stage the conversion into its own directory and do it once — LibreOffice is
+much slower than docmd, so converting per run wastes most of the time. And `soffice` will not run
+a headless conversion while a desktop LibreOffice session is open under the same user profile;
+close it, or pass a separate `-env:UserInstallation=file:///tmp/lo-docmd`.
 
 ## Usage
 
