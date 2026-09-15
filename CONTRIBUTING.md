@@ -99,6 +99,45 @@ What makes a folder useful:
 
 Fifty is plenty. Ours is 49.
 
+### Making a corpus you can measure against twice
+
+A coverage figure means nothing without the documents it was measured on, and this repo has
+already lost that link once: the earlier record of the corpus was a list of filenames, and by
+the time anyone tried to re-measure, **20 of its 21 names no longer resolved to a file**. Names
+do not survive reorganisation.
+
+`scripts/sample-docs.sh` takes a slice of a real collection and records a sha256 per document,
+so the identity is content rather than position:
+
+```console
+$ scripts/sample-docs.sh ~/Documents /tmp/corpus 50 --seed 7
+$ scripts/verify-corpus.sh /tmp/corpus
+corpus  /tmp/corpus
+id      03d4c21dd39327ad
+intact  50 of 50
+```
+
+The **corpus id** is a hash of the sorted document hashes. Two directories with the same id hold
+the same documents, whatever they are called and wherever they came from. Quote it beside any
+figure you publish, and a later run can prove it measured the same thing rather than merely the
+same number of things.
+
+`--seed` alone is not enough for that. `shuf --random-source` is deterministic, but it shuffles
+whatever `find` returned, so adding or removing one document anywhere in the source tree changes
+the sample the same seed produces. The seed makes a sample repeatable today; the manifest makes
+it identifiable later.
+
+When documents have moved, been renamed, or been reorganised, rebuild by content:
+
+```console
+$ scripts/verify-corpus.sh /tmp/corpus --rebuild ~/Dropbox
+  recovered  contract-2019.docx
+recovered 1 of 1
+```
+
+That looks up each missing document by hash, so it finds one whose filename has changed
+entirely.
+
 ### Reporting what you find
 
 Both paths below need **nothing of your document**, and please do not send one.
