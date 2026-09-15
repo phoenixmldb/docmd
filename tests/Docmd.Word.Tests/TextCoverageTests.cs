@@ -127,6 +127,18 @@ public sealed class TextCoverageTests : IDisposable
     }
 
     [Fact]
+    public void Measure_KeepsANonBreakingHyphenInsideATableCell()
+        // A table cell has its own text extraction, separate from the inline emitters, because a
+        // cell must reach the serialiser as one md:text. That made it a third reader with its own
+        // idea of what counts as text, and it was still dropping these after the run template and
+        // the oracle had both been fixed: "Single-family" came out "Singlefamily" in a zoning
+        // table. Found by the coverage check reporting the loss, which is the rule working.
+        => TextCoverageReport.Measure(
+                Source("""<w:tbl><w:tr><w:tc><w:p><w:r><w:t>Single</w:t><w:noBreakHyphen/><w:t>family</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"""),
+                "| Single-family |\n| --- |\n")
+            .IsComplete.Should().BeTrue();
+
+    [Fact]
     public void Measure_TreatsATabInsideARunAsAWordSeparator()
         // Word puts the tab inside the following run: <w:tab/><w:t>In General</w:t>. Counting it
         // as nothing welds it onto the previous run, the source reads "I.In General", and the

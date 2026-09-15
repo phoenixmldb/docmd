@@ -9,6 +9,17 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A table cell no longer drops non-breaking hyphens and symbols.** 0.2.0 fixed this for
+  ordinary text but missed table cells, which have their own text extraction — a cell has to
+  reach the serialiser as a single `md:text`, so it cannot use the inline emitters. Inside a
+  zoning table `Single-family` still converted as `Singlefamily`.
+
+  Found by the coverage check within an hour of releasing 0.2.0: the oracle counts both elements
+  and the table path did not emit them, so the mismatch was reported rather than silent. Under
+  0.1.2's oracle it would have gone unnoticed exactly as the original hyphen bug did.
+
 ## [0.2.0] — 2026-09-15
 
 A minor bump because **conversion output changes**: characters that were silently dropped now

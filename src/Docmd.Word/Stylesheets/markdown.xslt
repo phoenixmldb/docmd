@@ -373,9 +373,13 @@
                       string-join(
                           for $p in .//w:p[not(ancestor::w:txbxContent)]
                           return string-join(
-                              for $n in $p//*[self::w:t or self::w:br or self::w:tab]
+                              for $n in $p//*[self::w:t or self::w:br or self::w:tab
+                                              or self::w:noBreakHyphen or self::w:sym]
                                              [not(ancestor::w:del)]
-                              return if ($n/self::w:t) then string($n) else ' ',
+                              return if ($n/self::w:t) then string($n)
+                                     else if ($n/self::w:noBreakHyphen) then '-'
+                                     else if ($n/self::w:sym) then string($n/@docmd:char)
+                                     else ' ',
                               ''),
                           ' '))"/>
                 </md:text>
