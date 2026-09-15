@@ -12,7 +12,11 @@
          audience there is deciding whether to install rather than how to contribute. -->
     <PackageReadmeFile>PACKAGE.md</PackageReadmeFile>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/phoenixmldb/docmd</PackageProjectUrl>
+    <!-- nuget.org renders this as "Project website" and RepositoryUrl as "Source
+         repository", so they should not both be the repo: someone arriving from a
+         package search wants the documentation, and someone wanting the source
+         already has the other link. -->
+    <PackageProjectUrl>https://phoenixml.dev/tools/docmd</PackageProjectUrl>
     <RepositoryUrl>https://github.com/phoenixmldb/docmd</RepositoryUrl>
     <PackageTags>word;docx;markdown;converter;ooxml;rag;xslt</PackageTags>
     <!-- CA1303: literal strings in console output are the product's UI, not
