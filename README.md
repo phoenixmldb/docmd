@@ -122,15 +122,32 @@ schema Microsoft publishes — a closed public vocabulary, never anything your t
 wrote — and they are the whole actionable fact. Knowing the construct was `txbxContent` is what
 leads to a fix; knowing the word was "Here" tells us nothing.
 
-So a complete, useful report is:
+`--report` prints exactly that, with the content omitted **by construction** rather than by your
+editing:
 
-> docmd 0.1.0, one document, 2 of 3754 words lost, `drawing` and `txbxContent`.
+```console
+$ docmd report.docx --report
+docmd coverage report
+  docmd 0.2.2 · PhoenixmlDb.Xslt 2.0.0 · .NET 10.0.12 · linux-x64
 
-Open that as an issue. You never have to show us the document, and please don't.
+  1 document(s), 3,754 words
+  0 intact · 1 with losses · 2 lost (0.053 %)
 
-A flag to emit exactly that digest — aggregated across a folder, with the content omitted by
-construction rather than by your editing — is designed in
-[`docs/report-flag-design.md`](docs/report-flag-design.md) and not yet built.
+  causes, by occurrences
+    drawing                1
+    txbxContent            1
+
+  losses by document
+    #1       3,754 words      2 lost   drawing, txbxContent
+```
+
+Paste that into an issue. There is no filename, no path, no document property and no word of
+your text in it — the renderer is never given any, which is
+[a property of the code's shape](docs/report-flag-design.md) and one the tests check.
+
+Element names are printed only when they come from a published schema. A wrapper from a custom
+XML part reports as `foreign`: still enough to tell us an unrecognised construct cost you a
+word, without printing what your template author called it.
 
 **If you do have a corpus you can point at**, the batch audit reports across a whole folder:
 

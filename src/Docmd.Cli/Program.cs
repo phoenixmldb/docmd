@@ -118,6 +118,18 @@ internal static class Program
                 await Console.Error.WriteLineAsync(line).ConfigureAwait(false);
             }
 
+            // The digest goes to stdout, not stderr, because it is the thing being asked for
+            // rather than a warning about the conversion: a user redirects it to a file or
+            // pipes it to a clipboard. The stderr warning above still prints, and still
+            // quotes the document -- that copy is for the person who has the document and is
+            // looking for the passage.
+            if (parsed.Options!.Report)
+            {
+                await Console.Out
+                    .WriteAsync(CoverageDigest.Render([CoverageFacts.From(result.Coverage)], EngineVersion()))
+                    .ConfigureAwait(false);
+            }
+
             foreach (var key in result.StyleUsage.EntriesThatMatchedNothing)
             {
                 await Console.Error
@@ -185,6 +197,7 @@ internal static class Program
               --style-map <file>     map house styles to Markdown constructs (YAML)
               --img-dir <name>       image folder name (default: img)
               --no-images            omit images entirely
+              --report               print a coverage digest safe to paste into an issue
               --flavour <name>       gfm | commonmark (default: gfm)
               --front-matter <mode>  yaml | none (default: yaml)
               --print-stylesheet     write the built-in stylesheet to stdout and exit
@@ -198,4 +211,11 @@ internal static class Program
         review companion (--review), and "docmd register" / "docmd license" are not yet
         implemented. Each fails with a message rather than doing nothing quietly.
         """;
+
+    /// <summary>
+    /// The XSLT engine's version, for the coverage digest. Read off the loaded assembly rather
+    /// than a constant, so it cannot disagree with what actually ran.
+    /// </summary>
+    private static string? EngineVersion() =>
+        typeof(PhoenixmlDb.Xslt.XsltTransformer).Assembly.GetName().Version?.ToString(3);
 }

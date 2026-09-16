@@ -78,6 +78,7 @@ never moved.
 | `--asset-base-url <url>` | Emit remote URLs for images while writing them locally |
 | `--img-dir <name>` | Image folder name (default: `img`) |
 | `--no-images` | Omit images entirely |
+| `--report` | Print a coverage digest safe to paste into a public issue |
 | `--flavour <name>` | `gfm` or `commonmark` (default: `gfm`) |
 | `--front-matter <mode>` | `yaml` or `none` (default: `yaml`) |
 

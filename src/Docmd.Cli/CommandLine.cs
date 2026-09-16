@@ -55,6 +55,7 @@ internal static class CommandLine
         var output = ".";
         Uri? assetBaseUrl = null;
         var includeImages = true;
+        var report = false;
         var includeFrontmatter = true;
         var flavour = MarkdownFlavour.Gfm;
         var imageDirectory = "img";
@@ -85,6 +86,9 @@ internal static class CommandLine
             {
                 case "--no-images":
                     includeImages = false;
+                    break;
+                case "--report":
+                    report = true;
                     break;
                 case "--review":
                     // The review companion (spec §7.2) is a later plan. Accepting the flag and
@@ -204,6 +208,7 @@ internal static class CommandLine
             OutputDirectory = output,
             AssetBaseUrl = assetBaseUrl,
             IncludeImages = includeImages,
+            Report = report,
             IncludeFrontmatter = includeFrontmatter,
             Flavour = flavour,
             ImageDirectoryName = imageDirectory,
