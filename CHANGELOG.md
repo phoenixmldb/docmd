@@ -9,6 +9,40 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+## [0.2.3] — 2026-09-16
+
+### Added
+
+- **`--report`: a coverage digest you can paste into a public issue.** docmd measures every
+  conversion, which makes it the only instrument we have for documents we are never allowed to
+  see — and none of that could reach us, because the stderr warning quotes the document. Anyone
+  willing to help had to hand-redact it or stay quiet.
+
+  `--report` prints counts, cause element names and versions, aggregated, with documents
+  identified by ordinal. No filename, no path, no document property, no word of your text.
+
+  Redaction by construction rather than by filtering: the renderer takes a type with no field
+  capable of holding text, so it is never given the words to drop. Two tests check it.
+
+### Changed
+
+- **A loss inside an unrecognised wrapper is now reported as `foreign` rather than going
+  unattributed.** Cause names were filtered to WordprocessingML — safe, but silent about exactly
+  the construct the coverage check exists to surface. Names from any published schema now print
+  as themselves; anything else prints as `foreign`, because a custom XML part's element names are
+  written by whoever authored the template and are themselves customer content.
+
+### Fixed
+
+- **A paragraph containing a text box no longer drops non-breaking hyphens and symbols.**
+  `docmd:own-text`, the text-box exclusion path, was a fifth independent reader of what counts as
+  text and still carried the original list — so 0.2.2 dropped these characters in any paragraph
+  with a text box, having just been released to fix that class of bug elsewhere.
+
+  Five such readers are now two shared accessors, held together by a mutation-tested agreement
+  check. The consolidation is also **11% faster** than before: the old code evaluated its element
+  union twice per run, once to decide whether to emit anything and once to walk it.
+
 ## [0.2.2] — 2026-09-15
 
 Packaging and dependencies. **No behaviour change**: conversion output is byte-identical to
