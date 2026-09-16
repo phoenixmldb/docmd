@@ -373,13 +373,11 @@
                       string-join(
                           for $p in .//w:p[not(ancestor::w:txbxContent)]
                           return string-join(
-                              for $n in $p//*[self::w:t or self::w:br or self::w:tab
-                                              or self::w:noBreakHyphen or self::w:sym]
-                                             [not(ancestor::w:del)]
+                              for $n in docmd:text-nodes($p)[not(ancestor::w:del)]
                               return if ($n/self::w:t) then string($n)
-                                     else if ($n/self::w:noBreakHyphen) then '-'
-                                     else if ($n/self::w:sym) then string($n/@docmd:char)
-                                     else ' ',
+               else if ($n/self::w:noBreakHyphen) then '-'
+               else if ($n/self::w:sym) then string($n/@docmd:char)
+               else ' ',
                               ''),
                           ' '))"/>
                 </md:text>
@@ -457,7 +455,14 @@
   <xsl:template match="w:r" mode="inline">
     <xsl:variable name="text" select="string-join(w:t, '')"/>
 
-    <xsl:if test="$text ne '' or w:br or w:tab or w:noBreakHyphen or w:sym or w:drawing">
+    <!--
+      Bound once. This template runs for every run in the document, and runs are the most
+      numerous thing in a Word file, so asking docmd:text-children twice per run - once to
+      decide whether to emit anything, once to walk it - cost 13% of the whole transform.
+    -->
+    <xsl:variable name="parts" select="docmd:text-children(.) | w:drawing"/>
+
+    <xsl:if test="$text ne '' or exists($parts)">
       <!--
         BRIEF DEFECT (flagged, not silently resolved: see task-7-report.md). The plan's
         given template built this sequence as "all w:t joined, then all w:br appended",
@@ -472,7 +477,7 @@
         Folding w:drawing into the same document-order union keeps it in true position.
       -->
       <xsl:variable name="innermost" as="node()*">
-        <xsl:for-each select="w:t | w:br | w:tab | w:noBreakHyphen | w:sym | w:drawing">
+        <xsl:for-each select="$parts">
           <xsl:choose>
             <xsl:when test="self::w:t"><md:text><xsl:value-of select="."/></md:text></xsl:when>
             <xsl:when test="self::w:br"><md:br/></xsl:when>
@@ -593,20 +598,55 @@
       </xsl:when>
       <xsl:otherwise>
         <xsl:sequence select="string-join(
-            for $n in $node//*[self::w:t or self::w:tab or self::w:br]
-                              [not(ancestor::w:del)
-                               and empty(ancestor::w:txbxContent intersect $boxes)]
-            return if ($n/self::w:t) then string($n) else ' ',
+            for $n in docmd:text-nodes($node)[not(ancestor::w:del)
+                                              and empty(ancestor::w:txbxContent intersect $boxes)]
+            return if ($n/self::w:t) then string($n)
+               else if ($n/self::w:noBreakHyphen) then '-'
+               else if ($n/self::w:sym) then string($n/@docmd:char)
+               else ' ',
             '')"/>
       </xsl:otherwise>
     </xsl:choose>
   </xsl:function>
 
+  <!--
+    THE definition of what counts as text. Everything in this stylesheet that reads
+    text goes through these two functions, and TextCoverageReport.SourceWords in C#
+    is held to the same answer by MatchesTheStylesheetsIdeaOfText.
+
+    This is not tidiness. Four places used to decide independently, and they drifted
+    exactly as you would expect: w:noBreakHyphen was added to the run template, then
+    to this function, then to the oracle - and the table-cell join was missed, so a
+    release shipped claiming to have fixed dropped hyphens while zoning tables still
+    turned "Single-family" into "Singlefamily". Before that, the oracle and the
+    stylesheet reading the same three elements is what made 9,371 dropped hyphens
+    invisible: two readers with one blind spot agree about everything neither can see.
+
+    Adding an element here reaches every consumer at once.
+
+    Returned as a node sequence rather than asked per node. Calling a function inside a
+    predicate costs this engine dearly (phoenixmldb-xslt#95: one predicate in a match
+    pattern is 55x), and the first cut of this refactor asked the question of every child
+    and took a 23-second document to 84. One call per call site, with the union evaluated
+    natively inside it, is the same single definition at the original speed.
+  -->
+  <xsl:function name="docmd:text-nodes" as="element()*">
+    <xsl:param name="root" as="node()"/>
+    <xsl:sequence select="$root//*[self::w:t or self::w:tab or self::w:br
+                                   or self::w:noBreakHyphen or self::w:sym]"/>
+  </xsl:function>
+
+  <!-- The child-axis form, for a run, which wants its own children in document order. -->
+  <xsl:function name="docmd:text-children" as="element()*">
+    <xsl:param name="run" as="element()"/>
+    <xsl:sequence select="$run/*[self::w:t or self::w:tab or self::w:br
+                                 or self::w:noBreakHyphen or self::w:sym]"/>
+  </xsl:function>
+
   <xsl:function name="docmd:visible-text" as="xs:string">
     <xsl:param name="node" as="node()"/>
     <xsl:sequence select="string-join(
-        for $n in $node//*[self::w:t or self::w:tab or self::w:br or self::w:noBreakHyphen
-                           or self::w:sym][not(ancestor::w:del)]
+        for $n in docmd:text-nodes($node)[not(ancestor::w:del)]
         return if ($n/self::w:t) then string($n)
                else if ($n/self::w:noBreakHyphen) then '-'
                else if ($n/self::w:sym) then string($n/@docmd:char)

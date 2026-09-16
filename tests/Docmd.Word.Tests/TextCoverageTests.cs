@@ -5,6 +5,7 @@ using System.Xml.Linq;
 using Docmd.Word;
 using Docmd.Word.Assembly;
 using FluentAssertions;
+using Ooxml.Md.Core.Markdown;
 using Ooxml.Md.Core.Opc;
 using Ooxml.Md.Core.StyleMapping;
 using Xunit;
@@ -124,6 +125,38 @@ public sealed class TextCoverageTests : IDisposable
             "\n");
 
         coverage.Causes.Select(c => c.Construct).Should().Contain(["txbxContent", "pict"]);
+    }
+
+    [Fact]
+    public async Task SourceWords_MatchesTheStylesheetsIdeaOfText()
+    {
+        // The stylesheet now has one definition of what counts as text -- docmd:is-text-bearing
+        // and docmd:text-of -- and every path through it uses them. SourceWords is in C# and
+        // cannot share that code, so this is what holds the two together.
+        //
+        // It closes the last seam of a defect that recurred three times: the oracle and the
+        // transform deciding separately what text is, agreeing about anything neither reads,
+        // and therefore unable to detect a dropped character by comparing them. Add a
+        // text-bearing element to one side only and this fails.
+        // Both element lists must be exercised. The run path (docmd:text-children) and the
+        // descendant path (docmd:text-nodes, used by headings, table cells and the text-box
+        // exclusion) are separate selections, and a fixture of one plain paragraph only
+        // reaches the first: mutating the second left all 356 tests green.
+        var composite = Source(
+            """<w:p><w:r><w:t>alpha</w:t><w:noBreakHyphen/><w:t>beta</w:t><w:tab/><w:t>gamma</w:t>"""
+            + """<w:sym w:font="Symbol" w:char="F0B7"/><w:t>delta</w:t></w:r></w:p>"""
+            + """<w:tbl><w:tr><w:tc><w:p><w:r><w:t>epsilon</w:t><w:noBreakHyphen/><w:t>zeta</w:t>"""
+            + """<w:sym w:font="Symbol" w:char="F0B7"/><w:t>eta</w:t></w:r></w:p></w:tc></w:tr></w:tbl>""");
+        SymbolResolver.Annotate(composite);
+
+        var markdown = MarkdownSerializer.Serialize(
+            await MarkdownTransform.RunAsync(composite, TestContext.Current.CancellationToken));
+
+        var oracle = TextCoverageReport.SourceWords(composite);
+        var output = MarkdownTextReader.Words(markdown);
+
+        output.Should().BeEquivalentTo(oracle,
+            "the oracle and the stylesheet must agree about what text a document contains");
     }
 
     [Fact]
