@@ -1,7 +1,7 @@
 # `--report`: a coverage diagnostic that is safe to share
 
-**Status:** design, not implemented. `--report` is reserved in the CLI surface and listed in
-the README as not yet implemented.
+**Status: built in 0.2.3.** This document is kept as the reasoning behind the shape, not as a
+plan. Where it and the code disagree, the code is right.
 
 ## The problem
 

@@ -273,11 +273,18 @@ public static class TextCoverageReport
             }
 
             foreach (var name in carrier.Ancestors()
-                         // WordprocessingML only: the composite's own docmd: wrappers are
-                         // ancestors of every node in it, so without this every loss would
-                         // report "package" and "body" as though they explained something.
-                         .Where(a => a.Name.Namespace == Word && !PlainFlow.Contains(a.Name))
-                         .Select(a => a.Name.LocalName)
+                         // The composite's own docmd: wrappers are ancestors of every node in
+                         // it, so they are excluded outright: otherwise every loss would report
+                         // "package" and "body" as though they explained something.
+                         .Where(a => a.Name.Namespace != WordNames.Docmd
+                                     && a.Name.Namespace != WordNames.Md
+                                     && !PlainFlow.Contains(a.Name))
+                         // A name from a published schema prints as itself; anything else
+                         // prints as "foreign". Widening this to print every name would leak
+                         // whatever a template author called their custom XML elements, and
+                         // narrowing it to WordprocessingML alone - which it was - loses the
+                         // exotic wrapper this whole mechanism exists to surface.
+                         .Select(a => CoverageDigest.NameFor(a.Name.NamespaceName, a.Name.LocalName))
                          .Distinct(StringComparer.Ordinal))
             {
                 counts[name] = counts.GetValueOrDefault(name) + 1;

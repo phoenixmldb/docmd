@@ -64,5 +64,11 @@ public sealed record ConversionOptions
     /// Ignored when <see cref="IncludeImages"/> is false, since nothing is extracted at all.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// Print a coverage digest that can be pasted into a public issue: counts and element
+    /// names, never the document's text. See <see cref="Assembly.CoverageDigest"/>.
+    /// </summary>
+    public bool Report { get; init; }
+
     public IAssetSink? AssetSink { get; init; }
 }
