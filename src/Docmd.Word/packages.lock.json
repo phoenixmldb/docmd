@@ -4,12 +4,12 @@
     "net10.0": {
       "PhoenixmlDb.Xslt": {
         "type": "Direct",
-        "requested": "[2.0.0, )",
-        "resolved": "2.0.0",
-        "contentHash": "75gQpGiqlRUZenwZXE1lOGaZ+LxLeX3+ld0Hd+wVItdtiS3SQtaDmoCTi0uxaLIn9afP59iK7TCmo+NTM9hJLg==",
+        "requested": "[2.2.0, )",
+        "resolved": "2.2.0",
+        "contentHash": "xzT98pue5+ADhaFSaDOET5Sw70XY4Pwb0dYv8P4WH5ynTOtV0AXqrYIqvuLSNvr5JqZX1dUAYMFNop5xBcJsKA==",
         "dependencies": {
           "PhoenixmlDb.Core": "2.0.0",
-          "PhoenixmlDb.XQuery": "2.0.0"
+          "PhoenixmlDb.XQuery": "2.2.0"
         }
       },
       "Antlr4.Runtime.Standard": {
@@ -59,8 +59,8 @@
       },
       "PhoenixmlDb.XQuery": {
         "type": "Transitive",
-        "resolved": "2.0.0",
-        "contentHash": "4Wl0ttEx9YesNOK6vN1XENi3F0uDGXDhKCrlzbjNnccm2nrltGjWs2OHQpKzHqPB+GjAufFARANTCqGgoDqrgA==",
+        "resolved": "2.2.0",
+        "contentHash": "EZgR0v+7/iW2d7UsUy4zP45+v3X6rklf6IEuAnT3mLk+Bp1FK1UTkQCzZzTH5+wcD8ziX9xe+hCer826/Rs1vQ==",
         "dependencies": {
           "Antlr4.Runtime.Standard": "4.13.1",
           "Lucene.Net": "4.8.0-beta00016",
