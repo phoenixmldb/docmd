@@ -9,6 +9,34 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+## [0.2.4] — 2026-09-29
+
+Dependencies. **No behaviour change**: output is byte-identical across the 13-document corpus.
+
+### Changed
+
+- **`PhoenixmlDb.Xslt` 2.0.0 → 2.4.1** (bringing `PhoenixmlDb.XQuery` 2.4.1; Core stays at
+  2.0.0). Taken for a measured gain rather than for currency: the same document converts **20%
+  faster**, 26,609 ms to 21,264 ms, with the pin as the only variable.
+
+  It skips 2.1.0 and 2.2.0 deliberately. Verifying a bump costs the same whether it crosses one
+  release or four — build, tests, perf gate, byte-compare — and what grows with distance is
+  attribution, not effort.
+
+  2.4.1 is a hotfix for a native stack exhaustion, and the fix introduced a recursion-depth
+  ceiling that `phoenixmldb-xslt#199` says miscounts. docmd's nested-list rebuild is exactly the
+  shape that defect describes, so it was measured rather than reasoned about: synthetic
+  documents at 9, 50 and 200 levels of list nesting behave identically on both engines, and at
+  200 both stop at docmd's own serialiser guard rather than the engine's. `w:ilvl` caps at 8, so
+  real documents are nowhere near it.
+
+  `phoenixmldb-xslt#12` (a node passed to `SetParameter` is not usable as a node) is fixed in
+  this engine. `--style-map` can drop its workaround, which is a behaviour-adjacent change and
+  belongs in its own release.
+
+  Chained predicates remain quadratic — 21.5 s at n=1500 — so the stylesheet's one-predicate
+  contract is still load-bearing and still accurate.
+
 ## [0.2.3] — 2026-09-16
 
 ### Added
