@@ -60,11 +60,12 @@ already dead, while the anchor text survives. Recorded so the corpus audit can r
 - `docmd audit`, `-r`/`--recursive`, `--review`, `--style-map`, `--strict`, `--report` and
   `--revisions` all currently fail cleanly as not-yet-supported.
 
-## xunit v3 4.0 needs a test-platform migration, not a version bump
+## xunit v3 4.0 needed a test-platform migration, not a version bump
 
-**Status:** open, deliberately deferred 2026-09-10. Pinned at xunit.v3 3.2.2.
+**Status:** closed 2026-09-29. On xunit.v3 4.0.1, running on Microsoft.Testing.Platform 2.4.0.
 
-xunit.v3 4.0.0 drops VSTest support on the .NET 10 SDK and requires Microsoft.Testing.Platform:
+xunit.v3 4.0 drops VSTest on the .NET 10 SDK. The error names a property that sounds like the
+fix and is not:
 
 ```
 error : Testing with VSTest target is no longer supported by Microsoft.Testing.Platform
@@ -72,19 +73,38 @@ on .NET 10 SDK and later. If you use dotnet test, you should opt-in to the new d
 test experience.
 ```
 
-Setting `TestingPlatformDotnetTestSupport` is not sufficient on its own; the `dotnet test` CLI
-needs its own opt-in as well. Beyond that, MTP changes filter syntax, and `--filter
-"FullyQualifiedName~X"` appears in `.github/workflows/ci.yml` (which runs the performance gate as
-its own step), in `CONTRIBUTING.md` twice, and in the corpus-audit instructions. All of them
-change together or none do.
+`TestingPlatformDotnetTestSupport=true` is the pre-.NET-10 bridge: it redirects the VSTest
+target into `InvokeTestingPlatform`. MTP 2.4.0 removed that escape hatch, and the removal is
+what produces the error above. `Microsoft.Testing.Platform.MSBuild.targets` raises it from
+`_MTPBeforeVSTest`, guarded on nothing but the SDK major version and a variable named
+`_SupportsGlobalJsonTestRunner` — so the property cannot suppress it, and the refusal is
+conditioned on a *better* opt-in being available. The SDK agrees: `dotnet test --help` on
+10.0.401 says to opt in "via global.json".
 
-Deferred because it is orthogonal to shipping, and a hurried test-infrastructure migration
-immediately before a first release is a poor trade: the thing that tells you whether the release
-is sound is the last thing to rebuild in a hurry. Nothing about 3.2.2 is broken.
+**What it actually took**, which was less than this entry predicted:
 
-**Closes with:** `dotnet.config` selecting the MTP runner, the property above, the filter
-expressions rewritten in all four places, and a CI run proving the performance gate still runs
-in isolation.
+- `global.json` gains `"test": { "runner": "Microsoft.Testing.Platform" }`. Not `dotnet.config`,
+  which this entry guessed at; that is a different mechanism and not what this SDK reads.
+- Three packages removed rather than bumped, all VSTest-only and inert under MTP:
+  `Microsoft.NET.Test.Sdk`, `xunit.runner.visualstudio`, `coverlet.collector`. Reasoning is in
+  `Directory.Packages.props`. Coverage, if anyone ever wants a number, is `coverlet.mtp` or
+  `Microsoft.Testing.Extensions.CodeCoverage`; nothing here has asked for one.
+- `<OutputType>Exe</OutputType>` for test projects, which `Microsoft.NET.Test.Sdk` used to supply
+  implicitly. It is in `Directory.Build.props` conditioned on the project name, because
+  `IsTestProject` is set long after `.props` is evaluated and a condition on it never matches.
+- **The filter rewrite was unnecessary.** This entry expected `--filter
+  "FullyQualifiedName~X"` to change in four places. xunit.v3 4.x ships `--filter` accepting
+  VSTest syntax, so CI, `CONTRIBUTING.md` and the corpus-audit instructions are unchanged and
+  still correct. The restriction is that a VSTest filter cannot be combined with xunit's own
+  `--filter-class` / `--filter-query` forms, which nothing here does.
+
+**What we gained rather than paid for:** a run that executes no tests now exits 8 instead of
+passing. A filter typo used to be a silent green — measured, not assumed:
+`--filter "FullyQualifiedName~NoSuchTestNameAtAll"` exits 8, and the real suite exits 0.
+
+Verified: 363 tests (362 pass, 1 skip — the corpus audit), matching the pre-migration count of
+362 plus the one performance test the old filter excluded; `--locked-mode` restore clean; the
+performance gate still runs alone.
 
 ## Formats
 

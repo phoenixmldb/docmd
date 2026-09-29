@@ -57,6 +57,32 @@ deliberately not: `fixtures/real/sample.docx` is a genuine third-party-written d
 `word-noise` carries Word's own mess — `w:proofErr`, rsids, bookmarks between runs, words split
 mid-word at spell-check boundaries. Those two find bugs hand-written XML never does.
 
+### The test platform
+
+Tests run on **Microsoft.Testing.Platform**, not VSTest. `dotnet test docmd.slnx` is unchanged,
+and so is `--filter "FullyQualifiedName~Something"` — xunit.v3 4.x accepts VSTest filter syntax.
+Three things are worth knowing:
+
+- **Each test project is an executable.** `OutputType` is `Exe`, set centrally in
+  `Directory.Build.props` for any project whose name ends in `.Tests`, and you can run one
+  without `dotnet test`:
+
+  ```console
+  $ ./tests/Docmd.Word.Tests/bin/Release/net10.0/Docmd.Word.Tests
+  $ ./tests/Docmd.Word.Tests/bin/Release/net10.0/Docmd.Word.Tests -class Docmd.Word.Tests.TransformScalingTests
+  ```
+
+  Run that way it is xunit's own in-process console runner, whose options are single-dash and
+  different (`-class`, `-method`, `-trait`; `--help` lists them). The MTP options that
+  `dotnet test` accepts, `--filter` included, are rejected there with `unknown option`.
+- **A run that executes no tests fails**, with exit code 8. Under VSTest a filter that matched
+  nothing was a silent pass, which is the vacuous pass above with CI's name on it.
+- **A VSTest filter cannot be combined** with xunit's own `--filter-class` / `--filter-method` /
+  `--filter-query` forms. Pick one style per invocation.
+
+The opt-in is `"test": { "runner": "Microsoft.Testing.Platform" }` in `global.json`. Without it
+the SDK runs the VSTest command, which on .NET 10 fails the build rather than falling back.
+
 ### Running the corpus audit
 
 Against your own documents:

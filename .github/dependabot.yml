@@ -29,11 +29,12 @@ updates:
           - "PhoenixmlDb.*"
 
       # Test tooling churns often and rarely interestingly. One PR, not six.
+      # Microsoft.NET.Test.Sdk and coverlet.collector were dropped with the move to
+      # Microsoft.Testing.Platform; the MTP packages themselves arrive transitively through
+      # xunit.v3, so "xunit*" is the whole surface Dependabot can see here.
       test-tooling:
         patterns:
           - "xunit*"
-          - "Microsoft.NET.Test.Sdk"
-          - "coverlet*"
 
     ignore:
       # FluentAssertions 7.x and 8.x moved to the paid Xceed licence. docmd's core is

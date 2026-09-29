@@ -7,10 +7,22 @@
     <PackageVersion Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
   <ItemGroup>
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
-    <PackageVersion Include="xunit.v3" Version="3.2.2" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
-    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+    <!--
+      xunit.v3 4.x runs on Microsoft.Testing.Platform and nothing else. Three packages left
+      with 3.2.2, all of them VSTest-only and now inert:
+
+        Microsoft.NET.Test.Sdk        the VSTest targets and test host
+        xunit.runner.visualstudio     the VSTest adapter that discovered xunit tests
+        coverlet.collector            a VSTest data collector, reached via the collect flag
+
+      Removing them is not tidying. MTP 2.4.0 errors out of the VSTest target on the .NET 10
+      SDK, so keeping the first two cannot work; and a collector that no longer collects is
+      worse than an absent one, because the collect flag would still be accepted and quietly
+      do nothing. Coverage under MTP comes from coverlet.mtp or from
+      Microsoft.Testing.Extensions.CodeCoverage. Neither is added here, because nothing in
+      this repo has ever asked for a coverage number. See docs/deferred-work.md.
+    -->
+    <PackageVersion Include="xunit.v3" Version="4.0.1" />
     <!-- Intentionally pinned. 7.x/8.x moved to the Xceed licence (paid for commercial
          use); 6.12.2 is the last MIT release, and docmd is a commercial product.
          Do not bump without a licensing decision. -->
