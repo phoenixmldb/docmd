@@ -102,9 +102,10 @@ conditioned on a *better* opt-in being available. The SDK agrees: `dotnet test -
 passing. A filter typo used to be a silent green — measured, not assumed:
 `--filter "FullyQualifiedName~NoSuchTestNameAtAll"` exits 8, and the real suite exits 0.
 
-Verified: 363 tests (362 pass, 1 skip — the corpus audit), matching the pre-migration count of
-362 plus the one performance test the old filter excluded; `--locked-mode` restore clean; the
-performance gate still runs alone.
+Verified on 2026-09-29, against this commit: 363 tests — 362 pass, 1 skip (the corpus audit),
+which is the pre-migration count of 362 plus the one performance test the old filter excluded.
+`--locked-mode` restore clean; the performance gate still runs alone. The count is recorded as a
+dated measurement rather than as a standing fact; the suite is the fact.
 
 ## Formats
 
