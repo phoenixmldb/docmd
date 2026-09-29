@@ -37,6 +37,20 @@
     <PackageProjectUrl>https://github.com/phoenixmldb/docmd</PackageProjectUrl>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
+  <!--
+    Test projects are executables under Microsoft.Testing.Platform: a test assembly is its own
+    runner, so there is no external host to load it. xunit.v3 4.x fails the build without this
+    rather than inferring it, which is the right call but does mean it has to be said somewhere.
+
+    Here rather than in each csproj so a test project added later cannot quietly miss it. The
+    condition matches on the project name because IsTestProject is set by the test SDK targets,
+    which are imported long after Directory.Build.props is evaluated: conditioning on it here
+    would silently never match.
+  -->
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
   <!-- Deterministic in every configuration, not just Release: docmd's own output
        determinism is a product guarantee, and a non-deterministic build is a
        confusing thing to debug underneath it. -->

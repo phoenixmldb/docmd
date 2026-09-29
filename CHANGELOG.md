@@ -9,6 +9,39 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+Test infrastructure only. **No product change**: nothing under `src/` was touched, and no shipped
+package reference moved.
+
+### Changed
+
+- **xunit.v3 3.2.2 → 4.0.1**, which runs on Microsoft.Testing.Platform and drops VSTest. The
+  test platform moved with it; `dotnet test docmd.slnx` and the existing `--filter` expressions
+  are unchanged.
+
+  The opt-in is `"test": { "runner": "Microsoft.Testing.Platform" }` in `global.json`. The
+  property the error message points at, `TestingPlatformDotnetTestSupport`, is the pre-.NET-10
+  bridge and cannot help: MTP 2.4.0 raises the error from inside that bridge's own target,
+  guarded on the SDK major version alone.
+
+  Three VSTest-only packages were removed rather than bumped, because under MTP they do nothing:
+  `Microsoft.NET.Test.Sdk`, `xunit.runner.visualstudio` and `coverlet.collector`. Test projects
+  gained `<OutputType>Exe</OutputType>`, which `Microsoft.NET.Test.Sdk` used to supply.
+
+  Verified: 363 tests — 362 pass, 1 skip (the corpus audit) — which is the pre-migration count
+  of 362 plus the one performance test the old filter had excluded; `--locked-mode` restore
+  clean; the performance gate still runs in isolation.
+
+  A run that executes no tests now exits 8 rather than passing, so a filter that matches nothing
+  fails CI instead of going green. Full reasoning in
+  [`docs/deferred-work.md`](docs/deferred-work.md).
+
+### Fixed
+
+- `src/Docmd.Cli/packages.lock.json` recorded `Ooxml.Md.Core` at `0.2.3` after the 0.2.4 release.
+  Regenerating the lock files corrected it. Worth knowing that `--locked-mode` does not catch
+  this: it validates package versions, not the project-reference versions in the same file, so
+  that field goes stale on every release and nothing complains.
+
 ## [0.2.4] — 2026-09-29
 
 Dependencies. **No behaviour change**: output is byte-identical across the 13-document corpus.
