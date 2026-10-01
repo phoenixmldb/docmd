@@ -9,6 +9,39 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+### Changed
+
+- **`PhoenixmlDb.Xslt` 2.4.1 → 2.5.1** (bringing `PhoenixmlDb.XQuery` 2.5.1; Core stays at
+  2.0.0). **No behaviour change**: all 13 corpus documents convert byte-identically, confirmed
+  across four full runs (two on each engine), and the suite is unchanged at 363 tests.
+
+  Taken for a defect, not for speed. `phoenixmldb-xslt#199` — the recursion-depth ceiling that
+  miscounted, introduced by 2.4.1's stack-exhaustion hotfix — **is fixed**: element construction
+  no longer counts toward the recursion limit, and transformations now run on a large-stack
+  thread so the limit is reachable at all (`#197`). 0.2.4's entry recorded that defect as open
+  and argued around it, on the grounds that `w:ilvl` caps at 8 so docmd's nested-list rebuild
+  never approaches the ceiling. That argument was sound but it was still an argument; this
+  retires it.
+
+  **Performance is neutral: 391,310 ms → 387,352 ms over the 13-document corpus, a 1.0%
+  difference that is noise.** An earlier pair of runs appeared to show 37%, and that figure was
+  wrong — the slower arm ran while the machine was loaded. Nothing in the 43 commits between the
+  tags is performance work, which is what prompted re-measuring rather than reporting it. Quoted
+  against corpus id `789586bf36247fb0`.
+
+  The release also carries a security fix, `GHSA-86rg-wxgp-9p5j`, enforcing `ResourcePolicy`
+  across XSLT reads, fetches and `xsl:evaluate`. **docmd is not exposed today** — it configures
+  no policy, and its stylesheet calls none of the affected constructs (`document()`,
+  `unparsed-text`, `xsl:evaluate`, `xsl:import`, `xsl:source-document`). It matters later:
+  `--style-map` means running a stylesheet somebody else wrote, and sandboxing that needs a
+  policy that is actually enforced. When `--style-map` ships it should set one, and that only
+  works on 2.5.1 or newer.
+
+  The remaining 40-odd changes are streaming, accumulator and `current-group()` conformance
+  fixes. docmd's stylesheet neither streams nor groups, so they do not reach it — which is the
+  best available explanation for why the output did not move a byte.
+
+
 Test infrastructure only. **No product change**: nothing under `src/` was touched, and no shipped
 package reference moved.
 
