@@ -9,47 +9,45 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+## [0.2.5] — 2026-10-02
+
+Dependencies, test platform and documentation. **No behaviour change**: all 13 corpus documents
+convert byte-identically, confirmed across four full runs. The shipped dependency does move, so
+this is not a no-op release.
+
 ### Changed
 
 - **`PhoenixmlDb.Xslt` 2.4.1 → 2.5.1** (bringing `PhoenixmlDb.XQuery` 2.5.1; Core stays at
-  2.0.0). **No behaviour change**: all 13 corpus documents convert byte-identically, confirmed
-  across four full runs (two on each engine), and the suite is unchanged at 363 tests.
+  2.0.0).
 
   Taken for a defect, not for speed. `phoenixmldb-xslt#199` — the recursion-depth ceiling that
   miscounted, introduced by 2.4.1's stack-exhaustion hotfix — **is fixed**: element construction
   no longer counts toward the recursion limit, and transformations now run on a large-stack
   thread so the limit is reachable at all (`#197`). 0.2.4's entry recorded that defect as open
   and argued around it, on the grounds that `w:ilvl` caps at 8 so docmd's nested-list rebuild
-  never approaches the ceiling. That argument was sound but it was still an argument; this
+  never approaches the ceiling. The argument was sound and it was still an argument; this
   retires it.
 
-  **Performance is neutral: 391,310 ms → 387,352 ms over the 13-document corpus, a 1.0%
-  difference that is noise.** An earlier pair of runs appeared to show 37%, and that figure was
-  wrong — the slower arm ran while the machine was loaded. Nothing in the 43 commits between the
-  tags is performance work, which is what prompted re-measuring rather than reporting it. Quoted
-  against corpus id `789586bf36247fb0`.
+  **Performance is neutral: 391,310 ms → 387,352 ms over the corpus, a 1.0% difference that is
+  noise**, measured 2026-10-01 against corpus id `789586bf36247fb0`. An earlier pair of runs
+  appeared to show 37% and that figure was wrong — the slower arm ran while the machine was
+  loaded. Nothing in the 43 commits between the tags is performance work, which is what prompted
+  re-measuring rather than publishing it.
 
   The release also carries a security fix, `GHSA-86rg-wxgp-9p5j`, enforcing `ResourcePolicy`
-  across XSLT reads, fetches and `xsl:evaluate`. **docmd is not exposed today** — it configures
-  no policy, and its stylesheet calls none of the affected constructs (`document()`,
+  across XSLT reads, fetches and `xsl:evaluate`. **docmd is not exposed** — it configures no
+  policy, and its stylesheet calls none of the affected constructs (`document()`,
   `unparsed-text`, `xsl:evaluate`, `xsl:import`, `xsl:source-document`). It matters later:
   `--style-map` means running a stylesheet somebody else wrote, and sandboxing that needs a
-  policy that is actually enforced. When `--style-map` ships it should set one, and that only
-  works on 2.5.1 or newer.
+  policy that is actually enforced, so when `--style-map` ships it will need 2.5.1 or newer.
 
   The remaining 40-odd changes are streaming, accumulator and `current-group()` conformance
   fixes. docmd's stylesheet neither streams nor groups, so they do not reach it — which is the
-  best available explanation for why the output did not move a byte.
+  best available explanation for output that did not move a byte.
 
-
-Test infrastructure only. **No product change**: nothing under `src/` was touched, and no shipped
-package reference moved.
-
-### Changed
-
-- **xunit.v3 3.2.2 → 4.0.1**, which runs on Microsoft.Testing.Platform and drops VSTest. The
-  test platform moved with it; `dotnet test docmd.slnx` and the existing `--filter` expressions
-  are unchanged.
+- **xunit.v3 3.2.2 → 4.0.1, and the test platform with it.** xunit.v3 4.x runs on
+  Microsoft.Testing.Platform and drops VSTest. Test infrastructure only: nothing under `src/`
+  changed for this.
 
   The opt-in is `"test": { "runner": "Microsoft.Testing.Platform" }` in `global.json`. The
   property the error message points at, `TestingPlatformDotnetTestSupport`, is the pre-.NET-10
@@ -58,22 +56,57 @@ package reference moved.
 
   Three VSTest-only packages were removed rather than bumped, because under MTP they do nothing:
   `Microsoft.NET.Test.Sdk`, `xunit.runner.visualstudio` and `coverlet.collector`. Test projects
-  gained `<OutputType>Exe</OutputType>`, which `Microsoft.NET.Test.Sdk` used to supply.
+  gained `<OutputType>Exe</OutputType>`, which `Microsoft.NET.Test.Sdk` used to supply
+  implicitly. `dotnet test docmd.slnx` and every existing `--filter` expression are unchanged —
+  xunit.v3 4.x accepts VSTest filter syntax, so the rewrite this was expected to force did not
+  happen.
 
-  Verified: 363 tests — 362 pass, 1 skip (the corpus audit) — which is the pre-migration count
-  of 362 plus the one performance test the old filter had excluded; `--locked-mode` restore
-  clean; the performance gate still runs in isolation.
+  **A run that executes no tests now exits 8 rather than passing**, so a filter matching nothing
+  fails CI instead of going green. Measured, not assumed.
 
-  A run that executes no tests now exits 8 rather than passing, so a filter that matches nothing
-  fails CI instead of going green. Full reasoning in
-  [`docs/deferred-work.md`](docs/deferred-work.md).
+- `actions/upload-artifact` 4 → 7 in the release workflow. That step runs only on a tagged
+  release, so this release is the first time it executes.
 
 ### Fixed
 
-- `src/Docmd.Cli/packages.lock.json` recorded `Ooxml.Md.Core` at `0.2.3` after the 0.2.4 release.
-  Regenerating the lock files corrected it. Worth knowing that `--locked-mode` does not catch
-  this: it validates package versions, not the project-reference versions in the same file, so
-  that field goes stale on every release and nothing complains.
+- **Six regression tests for the inline transparent wrappers**, which had been fixed since
+  `v0.1.0` and pinned by nothing through eight releases. `a3e3558` fixed both text boxes and
+  inline `w:sdt` / `w:fldSimple` / `w:smartTag`, and shipped tests for the text-box half only;
+  the single content-control test covers the *block-level* form, which was never the broken one.
+  The tests were proven able to fail: reverting the select-list half of that commit fails five
+  of the six, and the sixth guards an exclusion that does not depend on it.
+
+- `src/Docmd.Cli/packages.lock.json` recorded `Ooxml.Md.Core` at `0.2.3` after the 0.2.4
+  release. Regenerating the lock files corrected it. Worth knowing that `--locked-mode` does not
+  catch this — verified by restoring the stale value deliberately, which exits 0. It validates
+  package versions, not the project-reference versions in the same file, so that field goes
+  stale on every release and nothing complains.
+
+### Documentation
+
+- **Two limitations in [`docs/limitations.md`](docs/limitations.md) said `Status: open` for
+  defects fixed on 2026-09-08.** That file is docmd's public accounting of what it cannot do, so
+  it was telling readers docmd drops text inside content controls, fields and smart tags, and
+  text inside text boxes. Both convert; verified end to end rather than inferred from a commit
+  log. Both entries now carry the fixing commit and name the tests that pin them.
+
+- The wrapper entry also dropped a prediction that was wrong: it said the policy for which
+  fields carry content needed corpus frequency data before it could be chosen. It did not —
+  `docmd:text-nodes` walks the descendant axis, so `TextCoverageReport` already counted that
+  text as words a reader can see, which means a transform unable to reach it reported itself as
+  lossy. The oracle had already decided.
+
+- `--report` is off the not-yet-supported list; it shipped in 0.2.3. `--style-map` carries a
+  note that it should set an `XsltTransformer.ResourcePolicy` when it ships.
+
+- **Three defects that are still real are now filed with reproducing fixtures** rather than left
+  in prose: [#37](https://github.com/phoenixmldb/docmd/issues/37) (a non-numeric `w:ilvl` aborts
+  the conversion — exit 1, no output file),
+  [#38](https://github.com/phoenixmldb/docmd/issues/38) (four or more leading tabs silently
+  become a CommonMark indented code block) and
+  [#39](https://github.com/phoenixmldb/docmd/issues/39) (an interrupted ordered list restarts at
+  `1.`). #38 and #39 both exit 0 and report no loss, which is what makes them worth filing:
+  every word survives and only its meaning changes, so the text-coverage oracle cannot see them.
 
 ## [0.2.4] — 2026-09-29
 

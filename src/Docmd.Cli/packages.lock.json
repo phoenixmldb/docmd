@@ -61,7 +61,7 @@
       "docmd.word": {
         "type": "Project",
         "dependencies": {
-          "Ooxml.Md.Core": "[0.2.4, )",
+          "Ooxml.Md.Core": "[0.2.5, )",
           "PhoenixmlDb.Xslt": "[2.5.1, )"
         }
       },
