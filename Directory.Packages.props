@@ -3,7 +3,7 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
-    <PackageVersion Include="PhoenixmlDb.Xslt" Version="2.4.1" />
+    <PackageVersion Include="PhoenixmlDb.Xslt" Version="2.5.1" />
     <PackageVersion Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
   <ItemGroup>
