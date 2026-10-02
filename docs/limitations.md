@@ -25,87 +25,58 @@ measurement changed. The oracle now counts `w:noBreakHyphen` and `w:sym`, which 
 could not see, so it reports losses the old one was structurally unable to detect — see the
 `w:sym` section below for what that blindness cost.
 
-## Text inside transparent wrappers is dropped
+## ~~Text inside transparent wrappers is dropped~~ — fixed
 
-**Status:** open. **Found:** whole-branch review of `feat/core-conversion`, 2026-09-04.
+**Status:** fixed. **Found:** whole-branch review of `feat/core-conversion`, 2026-09-04.
+**Fixed:** commit `a3e3558`, "read the wrappers that hide legitimate text". **Verified and
+pinned:** 2026-10-01.
 
-`markdown.xslt` emits inline content by selecting the *children* of a paragraph:
-
-```xml
-<xsl:apply-templates select="w:r | w:ins | w:hyperlink" mode="inline"/>
-```
-
-WordprocessingML has several elements that wrap runs without changing what the reader sees.
-The child axis does not descend through them, and no template matches them, so every run
-they contain contributes nothing at all:
+WordprocessingML has elements that wrap runs without changing what a reader sees. The child axis
+does not descend through them, so an earlier `markdown.xslt` — which selected
+`w:r | w:ins | w:hyperlink` from a paragraph — lost every run inside one:
 
 | Element | What it wraps | What Word shows |
 |---|---|---|
 | `w:sdt` (**inline only** — a child of `w:p`) | a content control inside a paragraph | the control's current text |
-| `w:fldSimple` | a field with its cached result | the result, e.g. a page number or a cross-reference |
+| `w:fldSimple` | a field with its cached result | the result |
 | `w:smartTag` | a recognised entity | the words, unchanged |
 
-**A block-level `w:sdt` is not affected.** One that wraps whole paragraphs sits in `w:body`,
-where the built-in rules walk into it and the paragraphs inside reach the template rules
-normally, so their text survives — pinned by
-`ListStylesheetTests.NumberedParagraphInsideAContentControl_KeepsItsText`. Only the inline
-form, where the control is a child of `w:p` and its runs are therefore not children of `w:p`,
-is dropped. Scoping this row to the inline form matters: read as "inline or block" it
-overstates the loss and would mis-size the work below.
+A block-level `w:sdt` was never affected: one wrapping whole paragraphs sits in `w:body`, where
+the built-in rules walk into it.
 
-Measured against the stylesheet at the time of writing, this input (all three wrappers below
-are the inline form — each is a child of `w:p`):
+**What it does now.** The paragraph templates select all three wrappers, and a template for each
+contributes its children; they recurse, so nesting works. This input, which previously produced
+`Field:` and nothing else, now yields every string:
 
 ```xml
 <w:p><w:sdt><w:sdtPr/><w:sdtContent><w:r><w:t>Inside control</w:t></w:r></w:sdtContent></w:sdt></w:p>
-<w:p><w:r><w:t>Field:</w:t></w:r><w:fldSimple w:instr="PAGE"><w:r><w:t>7</w:t></w:r></w:fldSimple></w:p>
+<w:p><w:r><w:t>Field:</w:t></w:r><w:fldSimple w:instr="DOCPROPERTY Title"><w:r><w:t>CachedResult</w:t></w:r></w:fldSimple></w:p>
 <w:p><w:smartTag><w:r><w:t>Acme Corp</w:t></w:r></w:smartTag></w:p>
 ```
 
-produces `Field:` and nothing else. "Inside control", "7" and "Acme Corp" are gone.
+**The whitelist stops where a reader stops.** `w:instrText` holds a field code rather than its
+result, and `w:del` holds text the author removed under track changes. Neither is emitted:
+putting `PAGE \* MERGEFORMAT` or a deleted price into a document someone indexes invents content,
+which is worse than missing it. The policy was chosen from measurement, not taste — across the
+corpus the stylesheet was built against, the cached results were 103 `DOCPROPERTY`, 12 `SEQ`, a
+`TITLE` and an `AUTHOR`, with no `PAGE` and no `TOC`. Every one of them content.
 
-This matters more than the element names suggest. Content controls are how templated
-corporate documents carry their variable parts — the customer name, the revision, the
-approval block — so the fields most worth indexing are exactly the ones most likely to be
-inside one.
+It remains a whitelist and will therefore always be incomplete, because OOXML keeps growing. The
+text-coverage check is what makes that survivable: a document whose words go missing says so.
 
-### The related inconsistency: a stray blank line
+**The stray blank line went with it.** Two axes used to disagree about a paragraph's text. The
+empty-paragraph suppression rule asks `docmd:visible-text` (descendant axis) and so *saw* this
+text and declined to suppress, while the inline emitters used the child axis and could not reach
+it — so the words were lost *and* a blank line was left where they had been. Emitting the text
+resolves both. Fixing the blank line alone would have made the loss less visible rather than
+less real.
 
-(Inline `w:sdt` again — a block-level one never reaches this rule as a paragraph's whole
-content.)
-
-Two places in the stylesheet disagree about which axis counts as "the text of a paragraph".
-The empty-paragraph suppression rule asks `docmd:visible-text`, which is `.//w:t` and
-therefore *does* see inside a `w:sdt`:
-
-```xml
-<xsl:template match="w:p[not(normalize-space(docmd:visible-text(.)))][not(.//w:drawing)]" priority="1"/>
-```
-
-So a paragraph whose only content is a `w:sdt` is not suppressed (it has visible text), then
-emits an empty `md:para` (the inline emitters cannot reach that text), and the serialiser
-turns that into a blank line. The paragraph's words are lost *and* a stray blank line is
-left where they were.
-
-### Why it is not fixed here
-
-Descending through transparent wrappers is a real design decision, not a one-line patch:
-`w:fldSimple` needs a policy for which fields have a meaningful cached result and which are
-noise (`PAGE`, `DATE`), an inline `w:sdt` needs a decision about whether its `w:sdtPr`
-placeholder text counts as content when the control is unfilled, and `w:hyperlink` already
-sets a precedent for how a wrapper contributes its children. That work belongs with the plan
-that also builds the corpus audit, so the choice can be made against measured frequencies.
-
-### What the audit must count
-
-- paragraphs containing at least one **inline** `w:sdt` (`w:p/w:sdt`), `w:fldSimple` or
-  `w:smartTag`, as a share of all paragraphs — block-level `w:sdt` is out of scope, since its
-  text already survives
-- characters of `w:t` unreachable from the child axis, as a share of all `w:t` characters
-- `w:fldSimple` occurrences by `w:instr` keyword, so the "which fields carry content" policy
-  is chosen from data
-- paragraphs emitting an empty `md:para` despite having non-empty `docmd:visible-text` — the
-  stray-blank-line case above, which is a direct count of the inconsistency
+**Pinned by** `MarkdownStylesheetTests`: `InlineContentControl_KeepsItsText`,
+`InlineContentControl_AsAWholeParagraph_LeavesNoBlankLine`, `FieldResult_IsEmitted`,
+`SmartTag_KeepsItsWords`, `FieldCode_IsNotEmitted` and `NestedWrappers_AreAllTransparent`.
+`a3e3558` shipped the fix with tests for the text-box half only; the wrapper half then went
+unpinned through every release from `v0.1.0` to `v0.2.4` — eight of them. Reverting the
+select-list half of that commit fails five of the six.
 
 ## Conversion cost climbs faster than document size above ~4,000 paragraphs
 
@@ -179,27 +150,28 @@ a sentence to attempt.
 
 Corpus effect at the time: it removed the single largest source of loss in the sample.
 
-## Text inside a text box is dropped
+## ~~Text inside a text box is dropped~~ — fixed
 
-**Status:** open. **Found:** the text-preservation oracle's first corpus run, 2026-09-05.
+**Status:** fixed. **Found:** the text-preservation oracle's first corpus run, 2026-09-05.
+**Fixed:** commit `a3e3558`. **Verified:** 2026-10-01.
 
 `w:txbxContent` holds paragraphs, but it sits inside `w:p/w:r/w:pict` (or `mc:AlternateContent`),
-so its paragraphs are not children of `w:body`. The `w:body` template groups over `*` — top-level
-children only — and the inline templates select `w:r | w:ins | w:hyperlink` from a paragraph, so
-nothing reaches into a text box. Every word inside one is lost.
+so its paragraphs are not children of `w:body`. Nothing reached into a text box and every word
+inside one was lost. Measured on the 49-document sample, one document contained 236
+`w:txbxContent` elements — text boxes are how pull quotes, callouts and diagram labels are
+authored, so the loss was concentrated in exactly the summarising sentences a retrieval index
+most wants.
 
-Measured on the 49-document sample: one document contained 236 `w:txbxContent` elements. Text
-boxes are how pull quotes, callouts and diagram labels are authored, so the loss is concentrated
-in exactly the summarising sentences a retrieval index would most want. docmd now counts them and
-says so when a document loses words, rather than leaving the reader to wonder where the text
-went.
-
-**What the audit must count:** `w:txbxContent` occurrences per document, and characters of `w:t`
-inside them as a share of all `w:t` characters.
+Text-box content now becomes blocks after its anchor paragraph. A paragraph holding only a text
+box does not also emit a blank paragraph, and a text box inside a table cell is not counted
+twice. Pinned by `TextBoxContent_BecomesBlocksAfterItsAnchorParagraph`,
+`AParagraphHoldingOnlyATextBox_DoesNotAlsoEmitABlankParagraph` and
+`ATextBoxInsideATableCell_IsNotCountedTwice`.
 
 ## A paragraph beginning with four or more tabs becomes a code block
 
-**Status:** open, parked deliberately at the end of the core-conversion wave.
+**Status:** open — [#38](https://github.com/phoenixmldb/docmd/issues/38). Parked deliberately at
+the end of the core-conversion wave; reproduced again on 2026-10-01.
 
 `w:tab` now emits one space (see the commit "Stop the stylesheet losing words"). A paragraph
 that opens with four or more consecutive tabs therefore starts its Markdown line with four or
@@ -218,7 +190,9 @@ something different again).
 
 ## A non-numeric `w:ilvl` still raises a dynamic error
 
-**Status:** open, pre-existing — not introduced by the core-conversion wave.
+**Status:** open — [#37](https://github.com/phoenixmldb/docmd/issues/37). Pre-existing, not
+introduced by the core-conversion wave; reproduced again on 2026-10-01, which confirmed it
+exits 1 with no output file rather than degrading.
 
 `docmd:ilvl` does `xs:integer(($p/w:pPr/w:numPr/w:ilvl/@w:val, '0')[1])`. An attribute present
 but not a number (`w:val="one"`, or empty) is a cast failure, which propagates out of
