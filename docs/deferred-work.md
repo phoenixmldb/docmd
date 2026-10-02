@@ -6,6 +6,9 @@ because later plans inherit them. Each says why it was deferred and what would c
 ## Known defects, ranked
 
 ### 1. `xs:integer` on a non-numeric `w:ilvl` raises a dynamic error
+
+**Filed as [#37](https://github.com/phoenixmldb/docmd/issues/37).** Reproduced 2026-10-01: it
+exits 1 and writes no output file, so in a batch the document is lost rather than degraded.
 `src/Docmd.Word/Stylesheets/markdown.xslt` — `docmd:ilvl` and the `is-ordered` predicate.
 
 Identical failure mode to the duplicate-`w:numId` crash already fixed with positional `[1]` guards:
@@ -17,6 +20,8 @@ duplicate-`numId` case (which merged or round-tripped documents produce routinel
 Closes with: a guarded cast, and a fixture asserting it degrades rather than throws.
 
 ### 2. Four or more leading `w:tab` render as an indented code block
+
+**Filed as [#38](https://github.com/phoenixmldb/docmd/issues/38).** Reproduced 2026-10-01.
 `markdown.xslt` emits one space per tab; the serialiser trims only *trailing* horizontal
 whitespace, never leading. Four leading spaces at the start of a block is CommonMark's indented
 code block, so a deeply tab-indented paragraph silently becomes code.
@@ -26,9 +31,21 @@ raised at the merge gate. Closes with: a `TrimStart(' ', '\t')` on a paragraph's
 line — which would also tidy the harmless leading space an emphasis span can emit at a paragraph
 start.
 
-### 3. Text inside inline content controls, fields and smart tags is dropped
-See `docs/limitations.md` for the measured detail and the counts a corpus audit must produce.
-Block-level `w:sdt` is *not* affected. Descending through transparent wrappers is a Plan 2 change.
+### 3. ~~Text inside inline content controls, fields and smart tags is dropped~~ — FIXED
+
+Fixed by commit `a3e3558`; verified end-to-end and pinned by tests on 2026-10-01. The paragraph
+templates descend through inline `w:sdt`, `w:fldSimple` and `w:smartTag`, and deliberately do not
+descend into `w:instrText` or `w:del`. The stray blank line that accompanied the loss went with
+it. See `docs/limitations.md` for the policy and its measured basis.
+
+This entry predicted the work needed frequency data from a corpus audit before the policy could
+be chosen. It did not: the oracle had already decided it. `docmd:text-nodes` walks the descendant
+axis, so `TextCoverageReport` already counted this text as words a reader can see — a transform
+that could not reach it did not merely omit it, it reported itself as lossy.
+
+Worth recording what the fix left behind. `a3e3558` pinned only its text-box half; the wrapper
+half shipped unprotected for three releases, and `ListStylesheetTests`' content-control test
+covers the *block-level* form, which was never the broken one. Six tests now cover it.
 
 ### 4. Table cells lose inline formatting, including hyperlink URLs
 A decided product trade-off, not an oversight — for retrieval a URL is near-worthless and often
@@ -44,6 +61,8 @@ already dead, while the anchor text survives. Recorded so the corpus audit can r
 - `--flavour commonmark` is parsed and plumbed, but the serialiser emits GFM tables regardless.
 - Ordered lists always restart at `1.`; a numbered procedure interrupted by a note paragraph
   renumbers from the top. `md:list/@start` exists in the vocabulary and is never emitted.
+  **Filed as [#39](https://github.com/phoenixmldb/docmd/issues/39)**, reproduced 2026-10-01. No
+  existing check catches it: the oracle counts words, and no word is missing.
 - Two media parts sharing a file name overwrite each other — `AssetRewriter` keys the output path
   on the file name alone.
 - ~~`HeadingAnnotator` walks `Descendants(w:p)`, which reaches paragraphs inside table cells...
@@ -57,8 +76,12 @@ already dead, while the anchor text survives. Recorded so the corpus audit can r
 - A new `XsltTransformer` is constructed and the stylesheet recompiled per document. Correct, but
   it will dominate cost once batch mode exists.
 - `md:heading/@slug` is emitted and unused today. It is Plan 2's cross-link key, not dead weight.
-- `docmd audit`, `-r`/`--recursive`, `--review`, `--style-map`, `--strict`, `--report` and
-  `--revisions` all currently fail cleanly as not-yet-supported.
+- `docmd audit`, `-r`/`--recursive`, `--review`, `--style-map`, `--strict` and `--revisions`
+  all currently fail cleanly as not-yet-supported. (`--report` shipped in 0.2.3 and is no longer
+  on this list.) `--style-map` is unblocked: `phoenixmldb-xslt#12` is closed, so its workaround
+  can go. When it ships it should set an `XsltTransformer.ResourcePolicy` — running a stylesheet
+  somebody else wrote is untrusted code, and policy enforcement across reads, fetches and
+  `xsl:evaluate` landed in Xslt 2.5.1 (GHSA-86rg-wxgp-9p5j).
 
 ## xunit v3 4.0 needed a test-platform migration, not a version bump
 

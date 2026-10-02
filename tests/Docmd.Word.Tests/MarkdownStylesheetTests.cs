@@ -225,6 +225,103 @@ public sealed class MarkdownStylesheetTests
         markdown.Should().Be("The vent is compliant\n");
     }
 
+    // ---------------------------------------------------------------------------------------
+    // Wrappers a reader never sees, holding text a reader does see.
+    //
+    // markdown.xslt descends through inline w:sdt, w:fldSimple and w:smartTag, and deliberately
+    // does NOT descend into w:instrText or w:del. That behaviour arrived as a fix and shipped
+    // with nothing pinning it: the block-level w:sdt route has a test, the inline route had
+    // none, and neither exclusion was asserted anywhere. This repo has already paid for that
+    // exact gap once - the w:tab branch of SourceWords was deleted, 356 tests stayed green, and
+    // 382 phantom losses appeared in the next corpus run. These tests close it.
+    //
+    // The oracle is why the inclusions are not optional. docmd:text-nodes walks the DESCENDANT
+    // axis, so TextCoverageReport already counts this text as words a reader can see; a
+    // transform that cannot reach it does not merely omit it, it reports itself as lossy.
+    // ---------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task InlineContentControl_KeepsItsText()
+    {
+        // A content control that is a child of w:p, so its runs are NOT children of w:p. This
+        // is the form carrying the variable parts of a templated document - the customer name,
+        // the revision, the approval block - which are the fields most worth indexing.
+        var markdown = await ToMarkdownAsync(
+            """<w:p><w:sdt><w:sdtPr/><w:sdtContent><w:r><w:t>Inside control</w:t></w:r></w:sdtContent></w:sdt></w:p>""");
+
+        markdown.Should().Be("Inside control\n");
+    }
+
+    [Fact]
+    public async Task InlineContentControl_AsAWholeParagraph_LeavesNoBlankLine()
+    {
+        // Two axes used to disagree about what counts as a paragraph's text. The empty-paragraph
+        // suppression rule asks docmd:visible-text (descendant axis) and so SAW this text and
+        // declined to suppress; the inline emitters used the child axis and could not reach it.
+        // The words were lost AND a stray blank line was left where they had been. Asserting the
+        // exact output pins both halves: fixing the blank line alone would have made the loss
+        // less visible rather than less real.
+        var markdown = await ToMarkdownAsync("""
+            <w:p><w:r><w:t>Before.</w:t></w:r></w:p>
+            <w:p><w:sdt><w:sdtPr/><w:sdtContent><w:r><w:t>Controlled</w:t></w:r></w:sdtContent></w:sdt></w:p>
+            <w:p><w:r><w:t>After.</w:t></w:r></w:p>
+            """);
+
+        markdown.Should().Be("Before.\n\nControlled\n\nAfter.\n");
+    }
+
+    [Fact]
+    public async Task FieldResult_IsEmitted()
+    {
+        // w:fldSimple holds a cached result, which is what Word shows. Measured across the
+        // corpus the stylesheet was built against, those results were 103 DOCPROPERTY, 12 SEQ,
+        // a TITLE and an AUTHOR, with no PAGE and no TOC - every one of them content.
+        var markdown = await ToMarkdownAsync("""
+            <w:p><w:r><w:t>Title: </w:t></w:r><w:fldSimple w:instr="DOCPROPERTY Title"><w:r><w:t>Zoning Code</w:t></w:r></w:fldSimple></w:p>
+            """);
+
+        markdown.Should().Be("Title: Zoning Code\n");
+    }
+
+    [Fact]
+    public async Task SmartTag_KeepsItsWords()
+    {
+        // A smart tag is a recognition marker around ordinary words. It contributes nothing of
+        // its own and must contribute all of its children.
+        var markdown = await ToMarkdownAsync(
+            """<w:p><w:smartTag><w:r><w:t>Acme Corp</w:t></w:r></w:smartTag><w:r><w:t> filed.</w:t></w:r></w:p>""");
+
+        markdown.Should().Be("Acme Corp filed.\n");
+    }
+
+    [Fact]
+    public async Task FieldCode_IsNotEmitted()
+    {
+        // The other half of the whitelist, and the half that fails loudly if it ever breaks.
+        // w:instrText is the field CODE, not its result. Emitting it would put a raw field
+        // instruction into a document someone indexes, which is worse than omission because it
+        // invents content rather than missing it.
+        var markdown = await ToMarkdownAsync("""
+            <w:p><w:r><w:instrText>PAGE \* MERGEFORMAT</w:instrText></w:r><w:r><w:t>Page text.</w:t></w:r></w:p>
+            """);
+
+        markdown.Should().Be("Page text.\n");
+        markdown.Should().NotContain("MERGEFORMAT");
+    }
+
+    [Fact]
+    public async Task NestedWrappers_AreAllTransparent()
+    {
+        // The templates recurse through each other, so a control inside a smart tag inside a
+        // control has to work. Real templated documents nest these routinely, and a whitelist
+        // that only handled one level would look correct on a simpler fixture.
+        var markdown = await ToMarkdownAsync("""
+            <w:p><w:sdt><w:sdtPr/><w:sdtContent><w:smartTag><w:sdt><w:sdtPr/><w:sdtContent><w:r><w:t>Deeply nested</w:t></w:r></w:sdtContent></w:sdt></w:smartTag></w:sdtContent></w:sdt></w:p>
+            """);
+
+        markdown.Should().Be("Deeply nested\n");
+    }
+
     [Fact]
     public async Task Heading_KeepsWordsApartAcrossATab()
     {
