@@ -39,13 +39,13 @@ public sealed class ListStylesheetTests
           <w:r><w:t>{text}</w:t></w:r></w:p>
         """;
 
-    private static async Task<string> ToMarkdownAsync(string bodyInner)
+    private static async Task<string> ToMarkdownAsync(string bodyInner, string numbering = Numbering)
     {
         var composite = XDocument.Parse($"""
             <docmd:package xmlns:docmd="https://phoenixml.dev/docmd" xmlns:w="{W}">
               <docmd:body><w:body>{bodyInner}</w:body></docmd:body>
               <docmd:styles><w:styles/></docmd:styles>
-              <docmd:numbering><w:numbering>{Numbering}</w:numbering></docmd:numbering>
+              <docmd:numbering><w:numbering>{numbering}</w:numbering></docmd:numbering>
               <docmd:relationships/><docmd:properties/>
             </docmd:package>
             """, LoadOptions.PreserveWhitespace);
@@ -163,4 +163,50 @@ public sealed class ListStylesheetTests
 
         markdown.Should().Be("Inside a content control.\n");
     }
+    // ---------------------------------------------------------------------------------------
+    // Guarded casts. markdown.xslt reads three integers straight out of the document, and all
+    // three used to abort the whole conversion on a value that would not cast: exit 1, no
+    // output file, and in a batch the document is lost rather than degraded. That contradicts
+    // the promise stated in the stylesheet itself -- one malformed document must never stop a
+    // corpus conversion -- which the duplicate-w:numId and undefined-numId cases already keep.
+    //
+    // Filed as #37, which named the first of the three. Probing for siblings found the other
+    // two, which is the habit this repository has earned: the "one definition of what counts
+    // as text" refactor found five readers where a commit message had claimed four.
+    // ---------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task NonNumericIlvlInTheDocument_DegradesToLevelZero()
+    {
+        // w:ilvl/@w:val is a spec-typed integer, so a non-numeric value means a more deeply
+        // malformed file than the duplicate-numId case -- which is an argument about priority,
+        // not about whether aborting is acceptable. numId 2 is decimal, so degrading to level 0
+        // keeps the item ordered and keeps its words.
+        var markdown = await ToMarkdownAsync(
+            """<w:p><w:pPr><w:numPr><w:ilvl w:val="notanumber"/><w:numId w:val="2"/></w:numPr></w:pPr><w:r><w:t>Item text</w:t></w:r></w:p>""");
+
+        markdown.Should().Be("1. Item text\n");
+    }
+
+    [Fact]
+    public async Task NonNumericIlvlInNumbering_DegradesToABullet()
+    {
+        // The same cast, one hop away and in a different part: w:lvl/@w:ilvl inside
+        // numbering.xml. #37 did not mention this one. No level then matches, so numFmt
+        // resolves to the empty string and the list degrades to a bullet -- exactly what an
+        // undefined numId already does.
+        var numbering = """
+            <w:num w:numId="7"><w:abstractNumId w:val="70"/></w:num>
+            <w:abstractNum w:abstractNumId="70">
+              <w:lvl w:ilvl="notanumber"><w:numFmt w:val="decimal"/></w:lvl>
+            </w:abstractNum>
+            """;
+
+        var markdown = await ToMarkdownAsync(
+            """<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="7"/></w:numPr></w:pPr><w:r><w:t>Numbered item</w:t></w:r></w:p>""",
+            numbering);
+
+        markdown.Should().Be("- Numbered item\n");
+    }
+
 }

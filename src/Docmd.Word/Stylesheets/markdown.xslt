@@ -138,9 +138,19 @@
                           else if ($id eq '0') then '' else $id"/>
   </xsl:function>
 
+  <!--
+    Guarded, because the value comes from the document. w:ilvl/@w:val is a spec-typed integer,
+    so a value that will not cast means a more deeply malformed file than the duplicate-numId
+    case below; that is an argument about how rare it is, not about whether aborting is
+    acceptable. Unguarded, this ended the whole conversion with exit 1 and no output file,
+    contradicting the promise that one malformed document must never stop a corpus conversion.
+    Level 0 is the same fallback the absent-attribute case already takes.
+  -->
   <xsl:function name="docmd:ilvl" as="xs:integer">
     <xsl:param name="p" as="element(w:p)"/>
-    <xsl:sequence select="xs:integer(($p/w:pPr/w:numPr/w:ilvl/@w:val, '0')[1])"/>
+    <xsl:variable name="val" as="xs:string"
+        select="string(($p/w:pPr/w:numPr/w:ilvl/@w:val, '0')[1])"/>
+    <xsl:sequence select="if ($val castable as xs:integer) then xs:integer($val) else 0"/>
   </xsl:function>
 
   <!--
@@ -170,7 +180,9 @@
         select="string(($numbering/w:num[@w:numId eq $numId]/w:abstractNumId/@w:val)[1])"/>
     <xsl:variable name="format"
         select="string(($numbering/w:abstractNum[@w:abstractNumId eq $abstractId]
-                                  /w:lvl[xs:integer(@w:ilvl) eq $ilvl]/w:numFmt/@w:val)[1])"/>
+                                  /w:lvl[if (@w:ilvl castable as xs:integer)
+                                         then xs:integer(@w:ilvl) eq $ilvl
+                                         else false()]/w:numFmt/@w:val)[1])"/>
     <xsl:sequence select="$format ne '' and $format ne 'bullet' and $format ne 'none'"/>
       </xsl:otherwise>
     </xsl:choose>
@@ -396,8 +408,11 @@
               the buggy fast path entirely and is proven equivalent for every gridSpan
               value tested (1, 2, 4).
             -->
+            <xsl:variable name="span" as="xs:string"
+                select="string((w:tcPr/w:gridSpan/@w:val, '1')[1])"/>
             <xsl:call-template name="empty-span-cells">
-              <xsl:with-param name="remaining" select="xs:integer((w:tcPr/w:gridSpan/@w:val, 1)[1]) - 1"/>
+              <xsl:with-param name="remaining"
+                  select="(if ($span castable as xs:integer) then xs:integer($span) else 1) - 1"/>
             </xsl:call-template>
           </xsl:for-each>
         </md:row>
