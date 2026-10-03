@@ -386,4 +386,54 @@ public sealed class MarkdownStylesheetTests
 
         markdown.Split("certified").Length.Should().Be(2, "the word should appear exactly once");
     }
+    // ---------------------------------------------------------------------------------------
+    // Leading whitespace at a paragraph start (#38).
+    //
+    // w:tab emits one space, and four or more at a paragraph start is CommonMark's indented
+    // code block: the words survive verbatim but are marked up as code, so a reader sees a
+    // monospaced block and an index sees a code span where prose was intended. Deeply
+    // tab-indented paragraphs are a manual-layout habit from older word processors, which is
+    // exactly what docmd converts.
+    //
+    // Only the FIRST physical line can do this. CommonMark does not let an indented code block
+    // interrupt a paragraph, so a continuation line after a hard break is a lazy continuation
+    // whatever its indentation -- which is why the fix is scoped to the first line and the
+    // tests below pin that scope rather than trimming everything in sight.
+    // ---------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task FourLeadingTabs_DoNotBecomeACodeBlock()
+    {
+        var markdown = await ToMarkdownAsync(
+            """<w:p><w:r><w:tab/><w:tab/><w:tab/><w:tab/><w:t>Deeply indented prose.</w:t></w:r></w:p>""");
+
+        markdown.Should().Be("Deeply indented prose.\n");
+    }
+
+    [Fact]
+    public async Task OneLeadingTab_IsKept()
+    {
+        // Below CommonMark's four-space threshold, so it renders identically either way and is
+        // not the defect. Trimming it anyway was measured first: it moved 1,100 lines across
+        // all 13 corpus documents where only 25 were the code-block bug. Output docmd's users
+        // commit and review is not worth reflowing for a change nothing renders.
+        var markdown = await ToMarkdownAsync(
+            """<w:p><w:r><w:tab/><w:t>Slightly indented.</w:t></w:r></w:p>""");
+
+        markdown.Should().Be(" Slightly indented.\n");
+    }
+
+    [Fact]
+    public async Task LeadingWhitespaceAfterAHardBreak_IsLeftAlone()
+    {
+        // The scope guard. A continuation line cannot start a code block, so its indentation
+        // is harmless, and stripping it would discard layout the document actually carries.
+        // If this test ever starts failing, the trim has widened beyond the defect.
+        var markdown = await ToMarkdownAsync(
+            """<w:p><w:r><w:t>First line.</w:t><w:br/><w:tab/><w:tab/><w:tab/><w:tab/><w:t>Indented continuation.</w:t></w:r></w:p>""");
+
+        markdown.Should().Be("First line.  \n    Indented continuation.\n");
+    }
+
+
 }
