@@ -163,4 +163,50 @@ public sealed class ListStylesheetTests
 
         markdown.Should().Be("Inside a content control.\n");
     }
+    // ---------------------------------------------------------------------------------------
+    // Numbering continues across an interruption (#39).
+    //
+    // Word stores no nesting and no list object: every item is a top-level w:p carrying a
+    // numId. w:body groups ADJACENT paragraphs sharing a numId, so a note in the middle of a
+    // procedure splits one list into two runs, and the second run began again at 1. Word shows
+    // 3, because the paragraphs share a numId and numbering continues.
+    //
+    // No existing check could catch this: every word survives, so the coverage oracle sees
+    // nothing, and the output is valid Markdown. Only a reader notices.
+    // ---------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task AnInterruptedOrderedList_ContinuesItsNumbering()
+    {
+        var markdown = await ToMarkdownAsync(
+            Item("First", 2, 0)
+            + Item("Second", 2, 0)
+            + """<w:p><w:r><w:t>An interrupting note.</w:t></w:r></w:p>"""
+            + Item("Third", 2, 0));
+
+        markdown.Should().Be("1. First\n2. Second\n\nAn interrupting note.\n\n3. Third\n");
+    }
+
+    [Fact]
+    public async Task TwoSeparateOrderedLists_EachStartAtOne()
+    {
+        // The counterpart, and the reason the count is scoped to one numId: two genuinely
+        // different lists must not continue each other. numId 2 and numId 4 are both decimal.
+        var markdown = await ToMarkdownAsync(
+            Item("Alpha", 2, 0)
+            + """<w:p><w:r><w:t>Between.</w:t></w:r></w:p>"""
+            + Item("Beta", 4, 0));
+
+        markdown.Should().Be("1. Alpha\n\nBetween.\n\n1. Beta\n");
+    }
+
+    [Fact]
+    public async Task AnInterruptedBulletList_IsUnaffected()
+        // Bullets have no number to continue, so the start attribute must not change them.
+        => (await ToMarkdownAsync(
+                Item("One", 1, 0)
+                + """<w:p><w:r><w:t>Note.</w:t></w:r></w:p>"""
+                + Item("Two", 1, 0)))
+            .Should().Be("- One\n\nNote.\n\n- Two\n");
+
 }
