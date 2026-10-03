@@ -46,6 +46,45 @@ jobs:
             exit 1
           fi
 
+      # The publish below passes --skip-duplicate, so re-tagging an already-published version
+      # SUCCEEDS while uploading nothing: the run goes green, the release notes say 0.2.5
+      # shipped, and what is on nuget.org is the older bytes. A published version can never be
+      # replaced, only unlisted, which makes publishing the one irreversible step here and the
+      # one worth a gate of its own. Before this existed the check was a human remembering to
+      # look.
+      #
+      # Unreachable nuget.org is a FAILURE, deliberately. A check that passes when it cannot
+      # verify anything is worse than no check, and this repository has spent real effort
+      # removing that failure mode elsewhere. A 404 on the index is NOT that: it means the
+      # package has never been published, which is the correct state for a first release.
+      #
+      # Known window: the flat-container listing lags a push by a few minutes (measured at
+      # roughly four for 0.2.5), so re-tagging within that window would still slip through.
+      # That is a narrower hole than the one this closes, and closing it completely would mean
+      # trusting an index that is slower still.
+      - name: Version is not already published
+        if: startsWith(github.ref, 'refs/tags/v') && inputs.dry-run != true
+        env:
+          FEED: https://api.nuget.org/v3-flatcontainer/docmd.cli/index.json
+        run: |
+          version=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
+          # curl's -w already prints 000 on a connection failure, so do not append another.
+          code=$(curl -sS -o /tmp/published.json -w '%{http_code}' --max-time 20 --retry 2 "$FEED") || true
+          code=${code:-000}
+          if [ "$code" = "404" ]; then
+            echo "docmd.cli is not on nuget.org at all; $version would be the first release."
+            exit 0
+          fi
+          if [ "$code" != "200" ]; then
+            echo "::error::Could not reach nuget.org to check whether $version is already published (HTTP $code). Refusing to publish rather than assuming it is new."
+            exit 1
+          fi
+          if VERSION="$version" python3 -c "import json,os,sys; sys.exit(0 if os.environ['VERSION'] in json.load(open('/tmp/published.json'))['versions'] else 1)"; then
+            echo "::error::$version is already published on nuget.org. A published version cannot be replaced, only unlisted. Bump <Version> and tag the new number."
+            exit 1
+          fi
+          echo "$version is not on nuget.org; safe to publish."
+
       - name: Restore (locked)
         run: dotnet restore docmd.slnx --locked-mode
 
