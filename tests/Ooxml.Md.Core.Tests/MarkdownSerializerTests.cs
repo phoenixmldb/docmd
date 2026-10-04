@@ -307,4 +307,49 @@ public sealed class MarkdownSerializerTests
         // "no letters or digits", not "no letters": a bold figure is meaningful.
         => Serialize("""<md:para><md:strong><md:text>5</md:text></md:strong></md:para>""")
             .Should().Be("**5**\n");
+    // ---------------------------------------------------------------------------------------
+    // Leading whitespace at a paragraph start (#38). The trim lives here, in the serialiser,
+    // so its scope is pinned here. Four or more leading spaces on a paragraph's first line is
+    // CommonMark's indented code block, and w:tab emits one space apiece.
+    // ---------------------------------------------------------------------------------------
+
+    [Fact]
+    public void ParagraphFirstLine_LosesAnIndentWideEnoughToBeCode()
+        => Serialize("""<md:para><md:text>    Deeply indented prose.</md:text></md:para>""")
+            .Should().Be("Deeply indented prose.\n");
+
+    [Fact]
+    public void ParagraphFirstLine_KeepsAnIndentTooNarrowToBeCode()
+        // Three spaces render identically with or without the trim, so the trim leaves them.
+        // The threshold is CommonMark's, and the measured reason for having one at all is in
+        // TrimCodeBlockIndent's own remarks.
+        => Serialize("""<md:para><md:text>   Three spaces.</md:text></md:para>""")
+            .Should().Be("   Three spaces.\n");
+
+    [Fact]
+    public void ParagraphContinuationLine_KeepsItsLeadingWhitespace()
+        // An indented code block cannot interrupt a paragraph, so a continuation line's
+        // indentation is harmless and is layout the document carries. The scope guard: if this
+        // fails, the trim has widened past the defect.
+        => Serialize("""<md:para><md:text>First line.</md:text><md:br/><md:text>    Indented continuation.</md:text></md:para>""")
+            .Should().Be("First line.  \n    Indented continuation.\n");
+
+    [Fact]
+    public void CodeBlock_KeepsItsOwnIndentation()
+        // md:code-block writes its lines verbatim on a different branch. The obvious over-broad
+        // fix for #38 -- trim every line of every block -- would silently reflow code.
+        => Serialize("""<md:code-block><md:text>    indented code</md:text></md:code-block>""")
+            .Should().Contain("    indented code");
+
+    [Fact]
+    public void AListItemsStructuralIndent_SurvivesTheTrim()
+        // The trim takes a paragraph's OWN leading whitespace; the list marker's indent is
+        // applied separately by WriteList. Conflating the two would unindent nested items.
+        => Serialize("""
+            <md:list><md:item><md:para><md:text>Outer</md:text></md:para>
+              <md:list><md:item><md:para><md:text>    Inner, itself indented</md:text></md:para></md:item></md:list>
+            </md:item></md:list>
+            """)
+            .Should().Contain("  - Inner, itself indented");
+
 }

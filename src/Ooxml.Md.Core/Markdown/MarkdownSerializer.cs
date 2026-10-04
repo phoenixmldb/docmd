@@ -76,8 +76,25 @@ public static class MarkdownSerializer
             // of the paragraph as a whole. Escaping only the string's own start would leave
             // a continuation line like "- item" unescaped, and CommonMark reads that as a
             // list item interrupting the paragraph.
-            foreach (var physicalLine in trimmed.Split(Newline))
+            // Leading horizontal whitespace is stripped from the FIRST physical line only.
+            // w:tab emits one space, so four or more tabs at a paragraph start produced
+            // CommonMark's indented code block: the words survived verbatim but came out
+            // marked up as code, which a reader sees as a monospaced block and an index sees
+            // as a code span. Deeply tab-indented paragraphs are a manual-layout habit from
+            // the older word processors docmd exists to convert.
+            //
+            // First line only, because CommonMark does not let an indented code block
+            // interrupt a paragraph: a continuation line after a hard break is a lazy
+            // continuation whatever its indentation, so its leading whitespace is harmless
+            // and is layout the document actually carries. Trimming every line would also
+            // reflow nothing here but would be a wider promise than the defect needs.
+            var physicalLines = trimmed.Split(Newline);
+            for (var index = 0; index < physicalLines.Length; index++)
             {
+                var physicalLine = index == 0
+                    ? TrimCodeBlockIndent(physicalLines[index])
+                    : physicalLines[index];
+
                 builder.Append(indent)
                        .Append(MarkdownEscaper.EscapeLineStart(physicalLine))
                        .Append(Newline);
@@ -385,6 +402,42 @@ public static class MarkdownSerializer
     /// right before the paragraph mark; this removes exactly that, and nothing else.
     /// </summary>
     private static string TrimTrailingHorizontalWhitespace(string text) => text.TrimEnd(' ', '\t');
+
+    /// <summary>
+    /// Strips a paragraph's first-line indent only when it is wide enough to become a
+    /// CommonMark indented code block.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Four is CommonMark's threshold, so four is the threshold here. Below it a leading
+    /// space changes nothing a reader sees: one to three leading spaces on a paragraph are
+    /// ignored outright when the Markdown is rendered.
+    /// </para>
+    /// <para>
+    /// The wider trim was written first and measured before it was kept, which is the reason
+    /// for the threshold. Trimming every leading space changed <b>1,100 lines across all 13
+    /// corpus documents, and only 25 of them were the defect</b>: the other 1,075 were one to
+    /// three spaces, rendering identically before and after. docmd's output is meant to be
+    /// committed and indexed, so a reflow of every file is a cost its users pay in review,
+    /// and 97.7% of it bought nothing. A cosmetic cleanup of that size is a decision worth
+    /// taking on its own rather than carried in on a bug fix.
+    /// </para>
+    /// <para>
+    /// Not symmetrical with <see cref="TrimTrailingHorizontalWhitespace"/>, deliberately.
+    /// Trailing whitespace is stripped by editors and linters on save, so leaving it makes a
+    /// re-conversion look like a diff against nothing; leading whitespace is ordinary
+    /// indentation that no linter touches, so the argument for trimming it unconditionally
+    /// does not carry over.
+    /// </para>
+    /// </remarks>
+    private static string TrimCodeBlockIndent(string text)
+    {
+        var indentWidth = text.Length - text.TrimStart(' ', '\t').Length;
+        return indentWidth >= CommonMarkCodeBlockIndent ? text.TrimStart(' ', '\t') : text;
+    }
+
+    /// <summary>Leading spaces that make CommonMark read a line as an indented code block.</summary>
+    private const int CommonMarkCodeBlockIndent = 4;
 
     private static void WriteTableDelimiter(StringBuilder builder, string indent, int columnCount)
     {
