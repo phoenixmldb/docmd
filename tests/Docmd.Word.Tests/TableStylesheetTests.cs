@@ -149,4 +149,21 @@ public sealed class TableStylesheetTests
 
         markdown.Should().Be("| a\\|b |\n| --- |\n");
     }
+    [Fact]
+    public async Task NonNumericGridSpan_DegradesToASingleCell()
+    {
+        // The third of the three document-controlled integer casts (see ListStylesheetTests
+        // for the other two). w:gridSpan/@w:val drives how many empty cells pad a spanned
+        // position, and a value that would not cast aborted the conversion. Falling back to 1
+        // means no padding, which is the same shape as a cell that never declared a span.
+        var markdown = await ToMarkdownAsync($"""
+            <w:tbl>
+              <w:tr>{Cell("Header")}{Cell("Second")}</w:tr>
+              <w:tr>{Cell("Spanned", """<w:gridSpan w:val="notanumber"/>""")}</w:tr>
+            </w:tbl>
+            """);
+
+        markdown.Should().Contain("Spanned").And.Contain("Header");
+    }
+
 }
