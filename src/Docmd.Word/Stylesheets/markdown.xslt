@@ -214,7 +214,31 @@
     <xsl:param name="items" as="element(w:p)*"/>
     <xsl:param name="level" as="xs:integer"/>
 
+    <!--
+      Numbering continues across an interruption. w:body groups ADJACENT paragraphs sharing a
+      numId, so a note in the middle of a procedure splits one list into two runs and the
+      second run used to begin again at 1. Word shows it continuing, because the paragraphs
+      share a numId.
+
+      Only at level 0, and only when the count is non-zero. Word restarts a nested level under
+      each new parent item by default, so a sub-list beginning at 1 is already correct and must
+      stay that way; and emitting no attribute for the ordinary uninterrupted case keeps the
+      output of every document that does not have this problem byte for byte what it was.
+
+      One predicate with `and`, not two chained ones: chained predicates are quadratic on this
+      engine (phoenixmldb-xslt#10 and #95).
+    -->
+    <xsl:variable name="run-num-id" select="docmd:num-id($items[1])"/>
+    <xsl:variable name="already-emitted" as="xs:integer"
+        select="if ($level eq 0)
+                then count($items[1]/preceding-sibling::w:p[
+                        docmd:num-id(.) eq $run-num-id and docmd:ilvl(.) eq 0])
+                else 0"/>
+
     <md:list ordered="{docmd:is-ordered($numbering, docmd:num-id($items[1]), $level)}">
+      <xsl:if test="$already-emitted gt 0">
+        <xsl:attribute name="start" select="$already-emitted + 1"/>
+      </xsl:if>
       <xsl:for-each-group select="$items" group-starting-with="w:p[docmd:ilvl(.) le $level]">
         <md:item>
           <md:para>
