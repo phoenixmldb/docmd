@@ -9,6 +9,42 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+### Changed
+
+- **`PhoenixmlDb.Xslt` 2.5.1 → 2.6.0** (bringing `PhoenixmlDb.XQuery` 2.6.0 and
+  `PhoenixmlDb.Core` 2.1.0). The performance release, and it reaches docmd: **the transform is
+  about 14% faster, with output byte for byte unchanged.**
+
+  Measured on the transform itself, 2,000 paragraphs, JIT warmed, seven rounds, with each
+  assembly verified in `bin` before its run:
+
+  | | 2.5.1 | 2.6.0 | |
+  |---|---:|---:|---:|
+  | min | 35,503 ms | 30,387 ms | **−14.4%** |
+  | median | 36,005 ms | 30,910 ms | −14.1% |
+  | max | 41,034 ms | 36,218 ms | −11.7% |
+
+  Every one of 2.6.0's bottom six rounds beats every one of 2.5.1's seven.
+
+  There is a mechanism, which is what was missing when a 37% "gain" on 2.5.1 turned out to be
+  machine load. Six of the seven `perf:` commits between the tags target `apply-templates`, and
+  one of them speeds up a union of child kind tests specifically. docmd's paragraph templates
+  select `w:r | w:ins | w:hyperlink | w:sdt | w:fldSimple | w:smartTag` in four places, once per
+  paragraph, on documents of thousands of paragraphs.
+
+  **End to end the gain is not resolvable on this hardware**, which is a property of the
+  instrument rather than the engine: CLI wall time also carries process startup, OPC unzip,
+  composite build, serialisation and file I/O, against a measured ~6% run-to-run spread. The
+  corpus runs were 390,116 ms on 2.5.1 against 366,810 / 374,190 / 368,737 on 2.6.0 — consistent
+  in direction, too close to the noise floor to quote. Quoted against corpus id
+  `789586bf36247fb0`.
+
+  The release also carries a security fix (`GHSA`-adjacent, upstream `bd57e34`) so a cancelled
+  transformation stops inside XPath, regex matching and sorting. docmd threads a
+  `CancellationToken` through `ConvertAsync` but nothing cancels today, so this costs nothing now
+  and is correct when batch mode arrives.
+
+
 ## [0.2.5] — 2026-10-02
 
 Dependencies, test platform and documentation. **No behaviour change**: all 13 corpus documents
