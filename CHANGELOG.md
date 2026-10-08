@@ -9,6 +9,70 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+### Changed
+
+- **`PhoenixmlDb.Xslt` 2.5.1 -> 2.7.0** (bringing `PhoenixmlDb.XQuery` 2.7.0 and
+  `PhoenixmlDb.Core` 2.0.0 -> 2.2.0).
+
+  **No behaviour change.** All 13 corpus documents convert byte-identically to 2.5.1 --
+  `diff -r` over both output trees reports nothing, 2,087,892 bytes each side. 383 tests pass.
+
+  Taken to clear two published advisories, not for speed. `GHSA-h2xc-4m53-6j8r` names 2.5.1,
+  the version 0.2.5 shipped, and is patched in 2.6.0; `GHSA-xxjq-rwpx-m5ww` names everything
+  up to and including 2.6.0, and is patched here. 2.7.0 is the first release that answers both.
+
+  **Neither advisory describes a hole docmd could reach, and moving does not close the one
+  docmd does have.** Measured, not assumed: cancelling a conversion of the largest corpus
+  document already works on 2.5.1 (requested at 500 ms, `OperationCanceledException` at
+  1,624 ms), because the built-in stylesheet returns to a template often enough to be
+  interrupted. What is *not* interruptible, on 2.5.1 and on 2.7.0 alike, is a stylesheet
+  whose time sits inside one regular-expression call -- a shape `--stylesheet` can reach. A
+  pattern that backtracks catastrophically ran for 90,886 ms after cancellation was requested
+  at 1,000 ms, on both versions. The lever that stops it is `XsltTransformer.RegexMatchTimeout`,
+  which bounded the same pattern at 2,013 ms with a diagnostic naming the expression; docmd
+  sets no timeout. Tracked separately -- it is docmd's gap on every engine version, not
+  something a pin bump fixes.
+
+  **Performance: 4.8% faster than the shipped 2.5.1, and 5.4% slower than 2.6.0.** Transform
+  time only, measured in-process over all 13 corpus documents, minimum of 5 runs per document,
+  all three engines built into separate worktrees and each asserting its own loaded assembly
+  version before timing:
+
+  | Engine | Corpus total | Largest document | Allocated | Peak working set |
+  |---|---|---|---|---|
+  | 2.5.1 | 212,828 ms | 41,874 ms | 5,296 MiB | 2,416 MiB |
+  | 2.6.0 | 194,280 ms | 38,356 ms | 5,062 MiB | 2,860 MiB |
+  | 2.7.0 | 204,756 ms | 40,716 ms | 5,064 MiB | 2,481 MiB |
+
+  The 2.7.0 regression against 2.6.0 is real, not noise: 12 of the 13 documents are slower,
+  the thirteenth is 18 paragraphs and 80 ms, and the five per-run figures for the two versions
+  do not overlap (2.6.0 38,356-39,089 ms; 2.7.0 40,716-40,994 ms). Allocations are unchanged
+  from 2.6.0 to within 0.1%, so the cost is compute, not garbage. 2.7.0's bulk is schema-aware
+  typing in XQuery -- typed values, schema-defined unions and lists, validation error codes --
+  and docmd configures no `SchemaProvider`, so this is work docmd pays for and cannot use.
+  Reported upstream.
+
+
+### Fixed
+
+- **A non-numeric `w:ilvl` no longer aborts the conversion**
+  ([#37](https://github.com/phoenixmldb/docmd/issues/37)). Every integer cast that reads a
+  document value is guarded: `docmd:ilvl`, the `is-ordered` level predicate and `w:gridSpan`
+  each fall back instead of raising a dynamic error. One malformed document could previously
+  exit 1 and write nothing, which in a batch lost the document rather than degrading it.
+
+- **Four or more leading tabs no longer turn a paragraph into a code block**
+  ([#38](https://github.com/phoenixmldb/docmd/issues/38)). This was text loss, not a cosmetic
+  slip: on one corpus document the coverage oracle's lost-word count fell from 17 to 4. The
+  serialiser now trims the leading whitespace of a block's first physical line when it reaches
+  4 columns, which is CommonMark's indented-code threshold, and leaves 1 to 3 alone.
+
+- **An interrupted ordered list continues its numbering**
+  ([#39](https://github.com/phoenixmldb/docmd/issues/39)). A numbered procedure broken by a note
+  paragraph restarted at `1.`. `build-list` now counts the preceding items of the same `w:numId`
+  at level 0 and emits `md:list/@start`, which the vocabulary already defined and the serialiser
+  already read.
+
 ## [0.2.5] — 2026-10-02
 
 Dependencies, test platform and documentation. **No behaviour change**: all 13 corpus documents
