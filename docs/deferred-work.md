@@ -5,31 +5,35 @@ because later plans inherit them. Each says why it was deferred and what would c
 
 ## Known defects, ranked
 
-### 1. `xs:integer` on a non-numeric `w:ilvl` raises a dynamic error
+### 1. ~~`xs:integer` on a non-numeric `w:ilvl` raises a dynamic error~~ — fixed
 
-**Filed as [#37](https://github.com/phoenixmldb/docmd/issues/37).** Reproduced 2026-10-01: it
-exits 1 and writes no output file, so in a batch the document is lost rather than degraded.
-`src/Docmd.Word/Stylesheets/markdown.xslt` — `docmd:ilvl` and the `is-ordered` predicate.
+**[#37](https://github.com/phoenixmldb/docmd/issues/37), closed 2026-10-04** by `a9813b8`. On
+`main`, not yet released. Three casts in `markdown.xslt` now test `castable as xs:integer` and
+fall back: `docmd:ilvl`, the `is-ordered` level predicate, and `w:gridSpan`. Two cast tests and a
+`gridSpan` test pin it.
 
-Identical failure mode to the duplicate-`w:numId` crash already fixed with positional `[1]` guards:
-a malformed value aborts the transform, which breaks the stated invariant that **one malformed
-document must never stop a corpus conversion**. Deferred rather than fixed because `w:ilvl/@w:val`
-is a spec-typed integer, so a non-numeric value implies a far more deeply malformed file than the
-duplicate-`numId` case (which merged or round-tripped documents produce routinely).
+The entry below is kept because the reasoning was wrong in an instructive way. It argued the
+defect could wait, on the grounds that `w:ilvl/@w:val` is a spec-typed integer so a bad value
+implies a far more deeply malformed file. That is true and it is beside the point: the invariant
+breached was **one malformed document must never stop a corpus conversion**, and how rare the
+input is does not change what happens when it arrives. The guard costs three lines.
 
-Closes with: a guarded cast, and a fixture asserting it degrades rather than throws.
+### 2. ~~Four or more leading `w:tab` render as an indented code block~~ — fixed
 
-### 2. Four or more leading `w:tab` render as an indented code block
+**[#38](https://github.com/phoenixmldb/docmd/issues/38), closed 2026-10-04** by `cdc84c2`. On
+`main`, not yet released. `MarkdownSerializer.TrimCodeBlockIndent` trims the leading horizontal
+whitespace of a block's first physical line only when it reaches 4 columns — CommonMark's
+indented-code threshold — and leaves 1 to 3 alone, because 1 to 3 are ignored by readers and
+trimming them would change output for no gain.
 
-**Filed as [#38](https://github.com/phoenixmldb/docmd/issues/38).** Reproduced 2026-10-01.
-`markdown.xslt` emits one space per tab; the serialiser trims only *trailing* horizontal
-whitespace, never leading. Four leading spaces at the start of a block is CommonMark's indented
-code block, so a deeply tab-indented paragraph silently becomes code.
-
-Deferred because the fix touches leading-whitespace policy, which is riskier than it looks and was
-raised at the merge gate. Closes with: a `TrimStart(' ', '\t')` on a paragraph's first physical
-line — which would also tidy the harmless leading space an emphasis span can emit at a paragraph
-start.
+It was **text loss, not cosmetic**: on one corpus document the coverage oracle's lost-word count
+fell from 17 to 4. Two numbers are worth keeping from the fix. A broad unconditional `TrimStart`
+moved 1,100 lines across the corpus, of which only 25 were the defect — which is why the
+threshold is in the code rather than in a comment. And the scope guards had to move to
+`MarkdownSerializerTests`, because the test written for them in `MarkdownStylesheetTests` was
+vacuous: it used `HTMLPreformatted`, which never produces `md:code-block` without a style-map
+rule, so it had been asserting on an ordinary indented paragraph all along. Only this change
+broke it into honesty.
 
 ### 3. ~~Text inside inline content controls, fields and smart tags is dropped~~ — FIXED
 
@@ -44,10 +48,37 @@ axis, so `TextCoverageReport` already counted this text as words a reader can se
 that could not reach it did not merely omit it, it reported itself as lossy.
 
 Worth recording what the fix left behind. `a3e3558` pinned only its text-box half; the wrapper
-half shipped unprotected for three releases, and `ListStylesheetTests`' content-control test
+half shipped unprotected for eight releases, v0.1.0 through v0.2.4, and `ListStylesheetTests`' content-control test
 covers the *block-level* form, which was never the broken one. Six tests now cover it.
 
-### 4. Table cells lose inline formatting, including hyperlink URLs
+### 4. `--stylesheet` runs a caller's stylesheet with no time limit, and cancelling does not stop it
+
+Open, found 2026-10-07 while verifying the Xslt 2.7.0 bump. `--stylesheet` ships and is fully
+wired; `MarkdownTransform.RunAsync` compiles whatever file it is handed. It sets neither
+`XsltTransformer.RegexMatchTimeout` nor `ResourcePolicy`, and `LoadStylesheetAsync` takes no
+cancellation token at all, so the compile phase has no lever either.
+
+Measured on the engine, not inferred. A stylesheet whose whole running time sits inside one
+`matches()` call with a catastrophically backtracking pattern:
+
+| Lever set | Outcome |
+|---|---|
+| Cancellation token only | ran **91,227 ms** to completion; the token had no effect |
+| `RegexMatchTimeout = 2s` | stopped at **2,013 ms**, naming the expression in the message |
+| Both | stopped at **2,002 ms** |
+
+Identical on 2.5.1 and 2.7.0, so no pin bump closes it — `GHSA-h2xc-4m53-6j8r` and
+`GHSA-xxjq-rwpx-m5ww` make the token and the timeout reach places they previously did not, but a
+timeout nobody sets still does not fire. docmd's *built-in* stylesheet is not affected: it returns
+to a template often enough that cancelling a conversion of the largest corpus document already
+works (requested at 500 ms, `OperationCanceledException` at 1,624 ms, on 2.5.1).
+
+Closes with: a `RegexMatchTimeout` whenever `--stylesheet` or `--style-map` is given, a
+`ResourcePolicy` alongside it, and a fixture that asserts a backtracking pattern is abandoned
+rather than waited on. The timeout wants to be a flag rather than a constant — a legitimate
+stylesheet on a large document can spend real time in a regex.
+
+### 5. Table cells lose inline formatting, including hyperlink URLs
 A decided product trade-off, not an oversight — for retrieval a URL is near-worthless and often
 already dead, while the anchor text survives. Recorded so the corpus audit can report it
 ("N tables contained hyperlinks flattened to text") rather than losing it silently.
@@ -59,10 +90,16 @@ already dead, while the anchor text survives. Recorded so the corpus audit can r
   lives in Core, so Core structurally cannot honour it. When threaded through, it belongs in a
   Core-side options type.
 - `--flavour commonmark` is parsed and plumbed, but the serialiser emits GFM tables regardless.
-- Ordered lists always restart at `1.`; a numbered procedure interrupted by a note paragraph
-  renumbers from the top. `md:list/@start` exists in the vocabulary and is never emitted.
-  **Filed as [#39](https://github.com/phoenixmldb/docmd/issues/39)**, reproduced 2026-10-01. No
-  existing check catches it: the oracle counts words, and no word is missing.
+- ~~Ordered lists always restart at `1.`; a numbered procedure interrupted by a note paragraph
+  renumbers from the top.~~ **Fixed** —
+  [#39](https://github.com/phoenixmldb/docmd/issues/39), closed 2026-10-04 by `c225d2d`, on
+  `main` and not yet released. `build-list` counts the preceding level-0 items of the same
+  `w:numId` and emits `md:list/@start`, which the vocabulary already defined and the serialiser
+  already read. Worth remembering why nothing caught it: the oracle counts words, and no word
+  was missing. A lossless check cannot see a wrong number. Also worth remembering that the
+  corpus could not confirm the fix either — it contains **zero** `w:numPr` paragraphs, so the
+  "0 of 13 documents changed" reading was vacuous, and the cost had to be measured on a
+  synthetic scaling probe against a control on `main`.
 - Two media parts sharing a file name overwrite each other — `AssetRewriter` keys the output path
   on the file name alone.
 - ~~`HeadingAnnotator` walks `Descendants(w:p)`, which reaches paragraphs inside table cells...
@@ -81,7 +118,8 @@ already dead, while the anchor text survives. Recorded so the corpus audit can r
   on this list.) `--style-map` is unblocked: `phoenixmldb-xslt#12` is closed, so its workaround
   can go. When it ships it should set an `XsltTransformer.ResourcePolicy` — running a stylesheet
   somebody else wrote is untrusted code, and policy enforcement across reads, fetches and
-  `xsl:evaluate` landed in Xslt 2.5.1 (GHSA-86rg-wxgp-9p5j).
+  `xsl:evaluate` landed in Xslt 2.5.1 (GHSA-86rg-wxgp-9p5j). Note that the shipping flag with
+  this exposure is `--stylesheet`, not `--style-map`; see defect 4.
 
 ## xunit v3 4.0 needed a test-platform migration, not a version bump
 
