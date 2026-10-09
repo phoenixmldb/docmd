@@ -40,6 +40,18 @@ public sealed record ConversionOptions
     /// </remarks>
     public string? StylesheetPath { get; init; }
 
+    /// <summary>
+    /// Longest any one regular-expression operation in the stylesheet may run, or null for no
+    /// limit. Defaults to <see cref="MarkdownTransform.DefaultRegexMatchTimeout"/>; the CLI
+    /// moves it with <c>--regex-timeout</c>.
+    /// </summary>
+    /// <remarks>
+    /// A limit rather than a cancellation token because the token is not the lever: a transform
+    /// whose running time sits inside one <c>matches()</c> call never returns to a template, so
+    /// nothing checks the token. See issue 48.
+    /// </remarks>
+    public TimeSpan? RegexMatchTimeout { get; init; } = MarkdownTransform.DefaultRegexMatchTimeout;
+
     /// <summary>House-style rules, or an empty map for built-in behaviour only.</summary>
     public StyleMap StyleMap { get; init; } = StyleMap.Empty;
 

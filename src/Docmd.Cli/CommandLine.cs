@@ -1,5 +1,6 @@
 namespace Docmd.Cli;
 
+using System.Globalization;
 using Docmd.Word;
 using Ooxml.Md.Core.Markdown;
 using Ooxml.Md.Core.StyleMapping;
@@ -61,6 +62,7 @@ internal static class CommandLine
         var imageDirectory = "img";
         string? stylesheetPath = null;
         var styleMap = StyleMap.Empty;
+        var regexMatchTimeout = (TimeSpan?)MarkdownTransform.DefaultRegexMatchTimeout;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -158,6 +160,38 @@ internal static class CommandLine
                     }
 
                     break;
+                case "--regex-timeout":
+                    if (!TryTake(args, ref i, out var regexTimeoutText))
+                    {
+                        return Fail($"{argument} requires a value in seconds, or 'none'.");
+                    }
+
+                    // A limit is the only thing that stops a stylesheet whose running time sits
+                    // inside one regex (issue 48), and a legitimate stylesheet on a large
+                    // document can spend real time there -- so it is adjustable, and removable.
+                    if (string.Equals(regexTimeoutText, "none", StringComparison.OrdinalIgnoreCase))
+                    {
+                        regexMatchTimeout = null;
+                    }
+                    else if (!double.TryParse(
+                                 regexTimeoutText, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds)
+                             || !double.IsFinite(seconds)
+                             || seconds < 0
+                             || seconds > TimeSpan.MaxValue.TotalSeconds)
+                    {
+                        return Fail(
+                            $"--regex-timeout takes a number of seconds, e.g. 30, or 'none' to " +
+                            $"remove the limit. Got '{regexTimeoutText}'.");
+                    }
+                    else
+                    {
+                        // Zero is accepted as a second spelling of "none": it is what somebody
+                        // reaching for "no limit" tries first, and a zero limit nothing can
+                        // satisfy would be a worse answer than the one they meant.
+                        regexMatchTimeout = seconds == 0 ? null : TimeSpan.FromSeconds(seconds);
+                    }
+
+                    break;
                 case "--img-dir":
                     if (!TryTake(args, ref i, out imageDirectory!))
                     {
@@ -214,6 +248,7 @@ internal static class CommandLine
             ImageDirectoryName = imageDirectory,
             StylesheetPath = stylesheetPath,
             StyleMap = styleMap,
+            RegexMatchTimeout = regexMatchTimeout,
         };
 
         return new ParseResult(CommandKind.Convert, input, options, null);

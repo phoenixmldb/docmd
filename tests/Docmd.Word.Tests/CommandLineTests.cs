@@ -1,6 +1,7 @@
 namespace Docmd.Word.Tests;
 
 using Docmd.Cli;
+using Docmd.Word;
 using FluentAssertions;
 using Ooxml.Md.Core.Markdown;
 using Xunit;
@@ -134,4 +135,33 @@ public sealed class CommandLineTests
         // values rather than seen as positionals.
         => CommandLine.Parse(["a.docx", "-o", "out/", "--img-dir", "media", "--flavour", "gfm"])
             .Error.Should().BeNull();
+
+    [Fact]
+    public void Parse_ReadsTheRegexTimeoutInSeconds()
+        => CommandLine.Parse(["report.docx", "--regex-timeout", "2.5"])
+            .Options!.RegexMatchTimeout.Should().Be(TimeSpan.FromSeconds(2.5));
+
+    [Fact]
+    public void Parse_TakesNoneAsNoRegexTimeout()
+    {
+        // A legitimate stylesheet on a large document can spend real time in one regex, so
+        // the limit has to be removable. "none" rather than "0" reads as a decision; 0 is
+        // accepted too because somebody will try it.
+        CommandLine.Parse(["report.docx", "--regex-timeout", "none"]).Options!.RegexMatchTimeout
+            .Should().BeNull();
+        CommandLine.Parse(["report.docx", "--regex-timeout", "0"]).Options!.RegexMatchTimeout
+            .Should().BeNull();
+    }
+
+    [Fact]
+    public void Parse_DefaultsTheRegexTimeout()
+        => CommandLine.Parse(["report.docx"]).Options!.RegexMatchTimeout
+            .Should().Be(MarkdownTransform.DefaultRegexMatchTimeout);
+
+    [Theory]
+    [InlineData("soon")]
+    [InlineData("-1")]
+    public void Parse_RejectsARegexTimeoutThatIsNotSeconds(string value)
+        => CommandLine.Parse(["report.docx", "--regex-timeout", value])
+            .Error.Should().Contain("--regex-timeout");
 }
