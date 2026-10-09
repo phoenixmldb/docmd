@@ -276,6 +276,12 @@ The stylesheet's own directory is its base URI, so if you split your overrides a
 relative `xsl:import` resolves against where those files live rather than against wherever you
 happened to run `docmd` from.
 
+A stylesheet you hand over runs under two bounds the engine does not set by itself: any one
+regular expression is abandoned after ten seconds (`--regex-timeout <seconds>` moves that,
+`none` removes it), and it may read documents and text only from its own directory, with no
+network and no writing. `xsl:import` is deliberately not confined that way. See
+[`docs/extending.md`](docs/extending.md#the-limits-it-runs-under) for why each bound exists.
+
 We are not going to anticipate every house style. What we can do is meet the technical
 interpretation of what is in the document and hand you the transform, so refining it is a matter
 of editing XSLT rather than filing a feature request.
