@@ -22,7 +22,7 @@
       Microsoft.Testing.Extensions.CodeCoverage. Neither is added here, because nothing in
       this repo has ever asked for a coverage number. See docs/deferred-work.md.
     -->
-    <PackageVersion Include="xunit.v3" Version="4.0.1" />
+    <PackageVersion Include="xunit.v3" Version="4.0.2" />
     <!-- Intentionally pinned. 7.x/8.x moved to the Xceed licence (paid for commercial
          use); 6.12.2 is the last MIT release, and docmd is a commercial product.
          Do not bump without a licensing decision. -->
