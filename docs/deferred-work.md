@@ -51,10 +51,27 @@ Worth recording what the fix left behind. `a3e3558` pinned only its text-box hal
 half shipped unprotected for eight releases, v0.1.0 through v0.2.4, and `ListStylesheetTests`' content-control test
 covers the *block-level* form, which was never the broken one. Six tests now cover it.
 
-### 4. `--stylesheet` runs a caller's stylesheet with no time limit, and cancelling does not stop it
+### 4. ~~`--stylesheet` runs a caller's stylesheet with no time limit, and cancelling does not stop it~~ — fixed
 
-Open, found 2026-10-07 while verifying the Xslt 2.7.0 bump. `--stylesheet` ships and is fully
-wired; `MarkdownTransform.RunAsync` compiles whatever file it is handed. It sets neither
+**[#48](https://github.com/phoenixmldb/docmd/issues/48), closed 2026-10-08.** On `main`, not yet
+released. Every transform now runs with `XsltTransformer.RegexMatchTimeout` set -- ten seconds by
+default, `--regex-timeout <seconds>` to move it, `--regex-timeout none` to remove it -- and with a
+`ResourcePolicy`: reads (`document()`, `unparsed-text()`, collections) confined to the
+stylesheet's own directory, imports allowed anywhere on the local file system, no network, no
+writes, no DTDs. The built-in stylesheet gets a policy that admits nothing, which is exactly its
+needs, so adding a read to it fails in the suite rather than quietly acquiring a capability.
+Eleven cases pin it, including the backtracking pattern from the report; the denial test was
+mutation-checked by removing the policy and watching it fail. A blown limit or a refused read
+exits 2, not 1, since the stylesheet is input.
+
+The reasoning below stands as written. One thing it got wrong by omission: it framed the fix as
+belonging to `--stylesheet` and `--style-map`, and the limit is in fact unconditional. There was
+no case for conditioning it -- the built-in stylesheet evaluates no regular expressions, so a
+limit cannot cost it anything, and a flag that only half-applies is a flag whose behaviour has to
+be explained.
+
+**The original entry.** Found 2026-10-07 while verifying the Xslt 2.7.0 bump. `--stylesheet`
+ships and is fully wired; `MarkdownTransform.RunAsync` compiles whatever file it is handed. It sets neither
 `XsltTransformer.RegexMatchTimeout` nor `ResourcePolicy`, and `LoadStylesheetAsync` takes no
 cancellation token at all, so the compile phase has no lever either.
 
@@ -116,10 +133,8 @@ already dead, while the anchor text survives. Recorded so the corpus audit can r
 - `docmd audit`, `-r`/`--recursive`, `--review`, `--style-map`, `--strict` and `--revisions`
   all currently fail cleanly as not-yet-supported. (`--report` shipped in 0.2.3 and is no longer
   on this list.) `--style-map` is unblocked: `phoenixmldb-xslt#12` is closed, so its workaround
-  can go. When it ships it should set an `XsltTransformer.ResourcePolicy` — running a stylesheet
-  somebody else wrote is untrusted code, and policy enforcement across reads, fetches and
-  `xsl:evaluate` landed in Xslt 2.5.1 (GHSA-86rg-wxgp-9p5j). Note that the shipping flag with
-  this exposure is `--stylesheet`, not `--style-map`; see defect 4.
+  can go. The `XsltTransformer.ResourcePolicy` this bullet asked for is now set on every
+  transform (defect 4), so `--style-map` inherits it rather than needing its own.
 
 ## xunit v3 4.0 needed a test-platform migration, not a version bump
 

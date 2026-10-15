@@ -9,6 +9,40 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+### Added
+
+- **`--regex-timeout <seconds>`** -- how long any one regular expression in a stylesheet may run.
+  Ten seconds by default; `none`, or `0`, removes the limit. It is a flag rather than a constant
+  because a legitimate match on a large document can take real time, and the only alternative to
+  a movable limit is no limit.
+
+### Fixed
+
+- **A stylesheet passed with `--stylesheet` can no longer run without end, and can no longer read
+  the rest of the disk** ([#48](https://github.com/phoenixmldb/docmd/issues/48)).
+
+  Cancellation was never the lever here. A transform whose whole running time sits inside one
+  `matches()` call never returns to a template, so nothing checks the token: a catastrophically
+  backtracking pattern ran for 90,886 ms after cancellation was requested at 1,000 ms, on 2.5.1
+  and 2.7.0 alike. docmd now sets `XsltTransformer.RegexMatchTimeout` on every transform, which
+  bounded that same pattern at 2,013 ms with a diagnostic naming the file, line and column of the
+  expression that ran long.
+
+  It also sets a `ResourcePolicy`, which the engine leaves unset by default. Reads --
+  `document()`, `unparsed-text()`, collections -- are confined to the stylesheet's own directory,
+  which is the lookup table shipped beside it and nothing else on disk. `xsl:import` and
+  `xsl:include` may resolve anywhere on the local file system, because a house stylesheet
+  commonly sits beside a shared module directory rather than above one; an imported module is
+  still held to the same read rule, so importing broadly does not widen what anything may read.
+  Neither may use the network. No writes, no DTD processing. `xsl:evaluate` still works -- it only
+  computes, and what it computes is judged by these same rules. The built-in stylesheet is given a
+  policy that admits nothing, which is exactly its needs: it has no imports, reads no documents
+  and evaluates no regular expressions.
+
+  A blown limit or a refused read exits **2**, the usage code, rather than 1 -- a stylesheet the
+  caller passed is input, and a CI script has to be able to tell that from an internal fault.
+  Eleven cases pin this, the backtracking pattern from the report among them.
+
 ### Changed
 
 - **`PhoenixmlDb.Xslt` 2.7.0 -> 2.9.0** (bringing `PhoenixmlDb.XQuery` 2.9.0 and
@@ -73,24 +107,31 @@ stylesheet writes against is not stable until `1.0`.
   sets no timeout. Tracked separately -- it is docmd's gap on every engine version, not
   something a pin bump fixes.
 
-  **Performance: 4.8% faster than the shipped 2.5.1, and 5.4% slower than 2.6.0.** Transform
-  time only, measured in-process over all 13 corpus documents, minimum of 5 runs per document,
-  all three engines built into separate worktrees and each asserting its own loaded assembly
-  version before timing:
+  **Performance: about 4% faster than the shipped 2.5.1, with no reliable difference against
+  2.6.0.** Measured on the largest corpus document, 6,282 paragraphs, each engine built into
+  its own worktree and asserting its own loaded assembly version before timing. The three
+  versions run **interleaved**, three rounds, minimum of 3 per round, and the version effect
+  is computed inside each round so that drift between rounds cancels:
 
-  | Engine | Corpus total | Largest document | Allocated | Peak working set |
-  |---|---|---|---|---|
-  | 2.5.1 | 212,828 ms | 41,874 ms | 5,296 MiB | 2,416 MiB |
-  | 2.6.0 | 194,280 ms | 38,356 ms | 5,062 MiB | 2,860 MiB |
-  | 2.7.0 | 204,756 ms | 40,716 ms | 5,064 MiB | 2,481 MiB |
+  | Comparison | per-round | mean |
+  |---|---|---|
+  | 2.6.0 vs 2.5.1 | -2.56%, -8.19%, -6.64% | **-5.80%** |
+  | 2.7.0 vs 2.5.1 | -0.71%, -6.36%, -5.05% | **-4.04%** |
+  | 2.7.0 vs 2.6.0 | +1.90%, +2.00%, +1.70% | +1.87% |
 
-  The 2.7.0 regression against 2.6.0 is real, not noise: 12 of the 13 documents are slower,
-  the thirteenth is 18 paragraphs and 80 ms, and the five per-run figures for the two versions
-  do not overlap (2.6.0 38,356-39,089 ms; 2.7.0 40,716-40,994 ms). Allocations are unchanged
-  from 2.6.0 to within 0.1%, so the cost is compute, not garbage. 2.7.0's bulk is schema-aware
-  typing in XQuery -- typed values, schema-defined unions and lists, validation error codes --
-  and docmd configures no `SchemaProvider`, so this is work docmd pays for and cannot use.
-  Reported upstream.
+  Both gains against 2.5.1 keep their sign in every round, so they are real. The last column
+  does not survive a second interleaved run, which put the same comparison at
+  -0.55%, +0.29% and -1.27% on this document and -0.95% on a 1,530-paragraph one. Pooled over
+  six interleaved rounds the figure is -1.27% to +2.00%, mean +0.68%, **and the sign flips**.
+  Any 2.7.0 cost against 2.6.0 is therefore under about 2%, and may be nothing.
+
+  Interleaving is what makes this measurable. One binary, one document and one `min` statistic
+  vary by **5.6% to 8.4%** across rounds minutes apart on this machine, so arms measured one
+  after another cannot separate a version from the machine. An earlier run did exactly that and
+  reported a 5.4% 2.7.0 regression against 2.6.0; that figure was drift and is withdrawn, as is
+  the schema-typing explanation offered for it. Setting `SchemaProvider` to null before
+  compiling changes neither the time (eight interleaved arms all inside a 1.3% band) nor the
+  output (byte-identical in every arm).
 
 
 ### Fixed

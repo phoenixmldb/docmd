@@ -75,6 +75,31 @@ rather than reconstructing it from the repository at whatever version you happen
 The stylesheet's own directory is its base URI, so relative `xsl:import` and `xsl:include`
 resolve against where your files live, not against wherever you ran `docmd`.
 
+### The limits it runs under
+
+A stylesheet you pass is code, and docmd runs it with two bounds the engine does not set by
+default.
+
+**One regular expression may run for ten seconds.** Past that the engine abandons it and the
+conversion fails, naming the file, line and column of the expression. This exists because a
+cancellation token cannot stop a `matches()` call: a transform whose whole running time sits
+inside one regex never returns to a template, so nothing checks the token. A pattern that
+backtracks catastrophically ran for 90,886 ms after cancellation was requested at 1,000 ms.
+If a legitimate match on a large document needs longer, `--regex-timeout <seconds>` moves the
+limit and `--regex-timeout none` removes it. The built-in stylesheet evaluates no regular
+expressions at all, so the limit never applies unless you add one.
+
+**Reads stay in the stylesheet's own directory.** `document()`, `unparsed-text()` and
+collections may open files beside your stylesheet — a lookup table shipped with it is the case
+this serves — and nothing else on disk. `xsl:import` and `xsl:include`, by contrast, resolve
+anywhere on the local file system, because a house stylesheet commonly sits beside a shared
+module directory rather than above one; an imported module is still held to the same read rule,
+so importing broadly does not widen what anything may read. Neither reads nor imports may use
+the network, DTDs are not processed, and nothing may write a file: docmd writes the Markdown.
+`xsl:evaluate` works — it only computes, and what it computes is judged by these same rules.
+
+A refused read or a blown limit exits **2**, the usage code, not 1: the stylesheet is input.
+
 ### What your stylesheet receives
 
 One composite document, described in [architecture.md](architecture.md#12-why-one-composite-document):
