@@ -98,6 +98,20 @@ so importing broadly does not widen what anything may read. Neither reads nor im
 the network, DTDs are not processed, and nothing may write a file: docmd writes the Markdown.
 `xsl:evaluate` works — it only computes, and what it computes is judged by these same rules.
 
+**What the engine withholds.** A stylesheet cannot read the environment of the docmd process:
+`environment-variable()` and `available-environment-variables()` answer nothing while it runs,
+and, since `PhoenixmlDb.Xslt` 2.8.0, while it compiles. The compiling half matters more than it
+sounds. A shadow attribute, a `use-when` or a static variable is evaluated by a second evaluator
+that read the real environment until that release (`GHSA-5697-c8qg-472f`), and a shadow attribute
+writes what it reads into the result -- so a licence key was one stylesheet away. The same release
+is what makes the read rule above hold while a stylesheet compiles: `xsl:import` and
+`xsl:include` opened their file by name beforehand, without consulting the policy. The time limit
+has reached static expressions since 2.7.0 (`GHSA-xxjq-rwpx-m5ww`).
+
+docmd pins 2.9.0. `EnginePremiseTests` asks for the environment three ways and expects nothing
+back, so a pin that moved below 2.8.0 fails the suite rather than quietly widening what a
+stylesheet can reach.
+
 A refused read or a blown limit exits **2**, the usage code, not 1: the stylesheet is input.
 
 ### What your stylesheet receives

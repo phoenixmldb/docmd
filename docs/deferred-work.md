@@ -62,7 +62,10 @@ writes, no DTDs. The built-in stylesheet gets a policy that admits nothing, whic
 needs, so adding a read to it fails in the suite rather than quietly acquiring a capability.
 Eleven cases pin it, including the backtracking pattern from the report; the denial test was
 mutation-checked by removing the policy and watching it fail. A blown limit or a refused read
-exits 2, not 1, since the stylesheet is input.
+exits 2, not 1, since the stylesheet is input. The read half of that policy needs an engine at
+2.8.0 or above to hold: below it, `xsl:import` opened its file before the policy was consulted,
+and a static expression could read the process environment (`GHSA-5697-c8qg-472f`). `main` pins
+2.9.0 and a canary in `EnginePremiseTests` fails if that floor is ever lost.
 
 The reasoning below stands as written. One thing it got wrong by omission: it framed the fix as
 belonging to `--stylesheet` and `--style-map`, and the limit is in fact unconditional. There was
