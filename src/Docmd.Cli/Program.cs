@@ -3,6 +3,7 @@ namespace Docmd.Cli;
 using System.Reflection;
 
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using Docmd.Word;
 using Docmd.Word.Assembly;
 using Ooxml.Md.Core.Opc;
@@ -167,6 +168,34 @@ internal static class Program
             await Console.Error.WriteLineAsync($"docmd: {ex.Message}").ConfigureAwait(false);
             return ExitBadInput;
         }
+        // The next two are the stylesheet's limits being enforced (issue 48), not internal
+        // failures: exit 2, the usage code, because what has to change is the stylesheet or
+        // the flag. Both are matched on the INNER exception, whose type is .NET's own -- the
+        // engine reports a regex timeout and a denied read through two unrelated exception
+        // hierarchies of its own, and the cause inside them is the stable thing.
+        catch (Exception ex) when (ex.InnerException is RegexMatchTimeoutException)
+        {
+            // The engine's message names the expression's file, line and column, which is the
+            // useful half, and an engine property nobody running docmd can set, which is not.
+            // Hence the second line.
+            await Console.Error.WriteLineAsync($"docmd: {ex.Message}").ConfigureAwait(false);
+            await Console.Error
+                .WriteLineAsync("docmd: raise the limit with --regex-timeout <seconds>, " +
+                                "or remove it with --regex-timeout none.")
+                .ConfigureAwait(false);
+            return ExitBadInput;
+        }
+        catch (PhoenixmlDb.Xslt.Engine.XsltException ex) when (parsed.Options!.StylesheetPath is not null)
+        {
+            // A stylesheet the caller passed is input, so its failure is a usage error --
+            // including a read the resource policy refused, which reaches here as an
+            // XsltException carrying the engine's diagnostic and no inner exception. The
+            // BUILT-IN stylesheet failing is a docmd bug and still exits 1 through the
+            // backstop below, which is why this is conditioned on the flag rather than on
+            // the exception alone.
+            await Console.Error.WriteLineAsync($"docmd: the stylesheet failed: {ex.Message}").ConfigureAwait(false);
+            return ExitBadInput;
+        }
         // Final backstop, not a substitute for the specific catches above: without it, any
         // exception this pipeline does not anticipate (e.g. ArgumentException from an empty
         // input path) surfaces as a raw stack trace, which contradicts the rule that bad
@@ -195,6 +224,8 @@ internal static class Program
               --asset-base-url <url> emit remote URLs for local assets
               --stylesheet <file>    run your own stylesheet instead of the built-in one
               --style-map <file>     map house styles to Markdown constructs (YAML)
+              --regex-timeout <secs> abandon one regular expression after this long
+                                     (default: 10, "none" to remove the limit)
               --img-dir <name>       image folder name (default: img)
               --no-images            omit images entirely
               --report               print a coverage digest safe to paste into an issue

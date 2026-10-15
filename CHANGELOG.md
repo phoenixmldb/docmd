@@ -9,6 +9,40 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+### Added
+
+- **`--regex-timeout <seconds>`** -- how long any one regular expression in a stylesheet may run.
+  Ten seconds by default; `none`, or `0`, removes the limit. It is a flag rather than a constant
+  because a legitimate match on a large document can take real time, and the only alternative to
+  a movable limit is no limit.
+
+### Fixed
+
+- **A stylesheet passed with `--stylesheet` can no longer run without end, and can no longer read
+  the rest of the disk** ([#48](https://github.com/phoenixmldb/docmd/issues/48)).
+
+  Cancellation was never the lever here. A transform whose whole running time sits inside one
+  `matches()` call never returns to a template, so nothing checks the token: a catastrophically
+  backtracking pattern ran for 90,886 ms after cancellation was requested at 1,000 ms, on 2.5.1
+  and 2.7.0 alike. docmd now sets `XsltTransformer.RegexMatchTimeout` on every transform, which
+  bounded that same pattern at 2,013 ms with a diagnostic naming the file, line and column of the
+  expression that ran long.
+
+  It also sets a `ResourcePolicy`, which the engine leaves unset by default. Reads --
+  `document()`, `unparsed-text()`, collections -- are confined to the stylesheet's own directory,
+  which is the lookup table shipped beside it and nothing else on disk. `xsl:import` and
+  `xsl:include` may resolve anywhere on the local file system, because a house stylesheet
+  commonly sits beside a shared module directory rather than above one; an imported module is
+  still held to the same read rule, so importing broadly does not widen what anything may read.
+  Neither may use the network. No writes, no DTD processing. `xsl:evaluate` still works -- it only
+  computes, and what it computes is judged by these same rules. The built-in stylesheet is given a
+  policy that admits nothing, which is exactly its needs: it has no imports, reads no documents
+  and evaluates no regular expressions.
+
+  A blown limit or a refused read exits **2**, the usage code, rather than 1 -- a stylesheet the
+  caller passed is input, and a CI script has to be able to tell that from an internal fault.
+  Eleven cases pin this, the backtracking pattern from the report among them.
+
 ### Changed
 
 - **`PhoenixmlDb.Xslt` 2.5.1 -> 2.7.0** (bringing `PhoenixmlDb.XQuery` 2.7.0 and
