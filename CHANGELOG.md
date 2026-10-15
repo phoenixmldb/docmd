@@ -45,6 +45,46 @@ stylesheet writes against is not stable until `1.0`.
 
 ### Changed
 
+- **`PhoenixmlDb.Xslt` 2.7.0 -> 2.9.0** (bringing `PhoenixmlDb.XQuery` 2.9.0 and
+  `PhoenixmlDb.Core` 2.2.0 -> 2.5.0).
+
+  **Taken for an advisory that names the version docmd shipped.** `GHSA-5697-c8qg-472f`
+  (high) names every release up to and including 2.7.0 and is patched in 2.8.0. Two of its
+  items are reachable through `--stylesheet`, which compiles and runs a stylesheet from the
+  caller inside docmd's own process:
+
+  - A **shadow attribute**, a `use-when` or a static variable is evaluated while the
+    stylesheet compiles, by a second evaluator that read the real process environment. At run
+    time `fn:environment-variable()` has always answered nothing. Measured on both versions
+    with a shadow attribute that reads one variable: 2.7.0 wrote the value into the result,
+    2.9.0 wrote an empty string. A licence key, or a token a build gave us, was readable this
+    way, and **no resource policy was needed to reach it**.
+  - Before compiling, the processor opened the file of each `xsl:import` and `xsl:include`
+    directly, without the policy and without the host's resolver, even where a `use-when`
+    excluded the instruction.
+
+  `EnginePremiseTests` now pins the first of those: a stylesheet that asks for the
+  environment three ways is answered nothing each time. The test fails on 2.7.0, so the pin
+  cannot slide back under 2.8.0 without the suite saying so.
+
+  **No behaviour change.** All 13 corpus documents convert byte-identically to 2.7.0 --
+  `diff -r` over both output trees reports nothing, 52 files and 4,877,492 bytes each side.
+  383 tests pass. Each arm was built in its own worktree, and the `PhoenixmlDb.Xslt` assembly
+  it loaded was checked against the package of that version before any document was
+  converted.
+
+  **The processor is schema-aware by default from 2.9.0.** A `type` attribute and
+  `validation="strict"` are accepted with no `xsl:import-schema`, and
+  `system-property('xsl:is-schema-aware')` answers `yes`. The built-in stylesheet declares no
+  validation and imports no schema, so nothing in the built-in path changes; a caller's
+  stylesheet that relied on XTSE1660 to refuse one of those now compiles instead.
+  `XsltTransformer.SchemaAware = false` asks for a basic processor again.
+
+  **No performance claim.** Converting the corpus end to end took 373 s on 2.7.0 and 358 s
+  on 2.9.0 -- one run each, not interleaved, which is inside the drift this machine shows
+  between two runs of the same binary. Engine timings are secondary to conformance while the
+  engines are still closing it, so this bump was not benchmarked further.
+
 - **`PhoenixmlDb.Xslt` 2.5.1 -> 2.7.0** (bringing `PhoenixmlDb.XQuery` 2.7.0 and
   `PhoenixmlDb.Core` 2.0.0 -> 2.2.0).
 
