@@ -6,24 +6,41 @@ so the decision to leave it can be revisited with numbers instead of guesses.
 
 **Measured, not estimated.** docmd checks every conversion: it compares the words a reader can
 see in the `.docx` against the words a Markdown parser recovers from the output, and reports any
-that did not survive. Measured 2026-09-14 on docmd 0.2.0, against corpus `dca5084324a9022c`:
+that did not survive. Measured 2026-10-15 on docmd 0.3.0, against corpus `394b2cb31e7459a1`:
 
 | | |
 |---|---|
-| Documents converted | 50 of 50, none failed |
-| Documents losing not one word | **27** |
-| Words lost, all documents | **134** of ~51,800 — 0.26% |
-| Worst document | 61 words (97.3% kept) |
+| Documents converted | 49 of 49, none failed |
+| Documents losing not one word | **45** |
+| Words lost, all documents | **21** of 245,034 — 0.009% |
+| Worst document, by words | 11 words (99.8% kept) |
+| Worst document, by share | 2 of 177 words (98.9% kept) |
+| Sampled files that are not Word packages | 1 of 50 — a Word 97-2003 binary named `.docx` |
+
+**What the 21 words were**, by cause, each one already described in a section below:
+
+| Words | Document | Cause |
+|---|---|---|
+| 11 | one of 6,179 words | unmapped `w:sym` characters — the symbol-font encoding has no honest mapping |
+| 7 | one of 1,325 words | words fused at a figure-caption boundary, so the oracle counts the pair as missing |
+| 2 | one of 177 words | text inside `<pict>` and `<shape>` drawing wrappers |
+| 1 | one of 118,338 words | a bare URL |
+
+Nothing new appeared, which is the useful result: every loss falls into a cause this file already
+records, and the two causes 0.3.0 fixed produced no losses at all.
 
 The corpus id is a content hash produced by `scripts/verify-corpus.sh`, and it is quoted here so
-the figure can be re-run against the same documents. It could not be, last time: the previous
-record was a list of filenames, and when the measurement changed, 20 of its 21 names no longer
-resolved to a file.
+the figure can be re-run against the same documents.
 
-**Not comparable to the 0.1.0 figures** (43 of 49, 12 words). Both the documents and the
-measurement changed. The oracle now counts `w:noBreakHyphen` and `w:sym`, which it previously
-could not see, so it reports losses the old one was structurally unable to detect — see the
-`w:sym` section below for what that blindness cost.
+**Twice now, the corpus behind an earlier figure could not be re-measured.** The record before
+`verify-corpus.sh` existed was a list of filenames, and when the measurement changed, 20 of its
+21 names no longer resolved to a file. `dca5084324a9022c` was recorded by content hash instead —
+and it is equally unreachable, because the `_source.tsv` that held those hashes was not kept. An
+id *recognises* a corpus; it cannot reconstruct one. The manifest has to be kept with the figure.
+
+**Not comparable to the 0.2.0 figures** (27 of 50, 134 words of ~51,800). Different documents and
+a different converter: the tab-indented code block below was worth 17 words on one document of
+that corpus by itself. The gap between the two figures measures nothing.
 
 ## ~~Text inside transparent wrappers is dropped~~ — fixed
 
@@ -168,10 +185,17 @@ twice. Pinned by `TextBoxContent_BecomesBlocksAfterItsAnchorParagraph`,
 `AParagraphHoldingOnlyATextBox_DoesNotAlsoEmitABlankParagraph` and
 `ATextBoxInsideATableCell_IsNotCountedTwice`.
 
-## A paragraph beginning with four or more tabs becomes a code block
+## ~~A paragraph beginning with four or more tabs becomes a code block~~ — fixed
 
-**Status:** open — [#38](https://github.com/phoenixmldb/docmd/issues/38). Parked deliberately at
-the end of the core-conversion wave; reproduced again on 2026-10-01.
+**Status:** fixed in 0.3.0 — [#38](https://github.com/phoenixmldb/docmd/issues/38).
+**Found:** the corpus audit, where it cost 17 words on one document. **Fixed:** commit `cdc84c2`,
+"a four-space indent no longer turns a paragraph into code". **Verified:** the 2026-10-15 audit
+above, where no document loses a word to this cause.
+
+The account below is the defect as it stood. `MarkdownSerializer` now owns the
+leading-whitespace policy it describes: it trims the leading whitespace of a block's first
+physical line when that line reaches 4 columns, which is CommonMark's indented-code threshold,
+and leaves 1 to 3 alone.
 
 `w:tab` now emits one space (see the commit "Stop the stylesheet losing words"). A paragraph
 that opens with four or more consecutive tabs therefore starts its Markdown line with four or
@@ -188,11 +212,16 @@ surface to move immediately before a merge.
 leading spaces, and how many of those are inside a list item (where the indentation means
 something different again).
 
-## A non-numeric `w:ilvl` still raises a dynamic error
+## ~~A non-numeric `w:ilvl` still raises a dynamic error~~ — fixed
 
-**Status:** open — [#37](https://github.com/phoenixmldb/docmd/issues/37). Pre-existing, not
-introduced by the core-conversion wave; reproduced again on 2026-10-01, which confirmed it
-exits 1 with no output file rather than degrading.
+**Status:** fixed in 0.3.0 — [#37](https://github.com/phoenixmldb/docmd/issues/37).
+**Found:** pre-existing, reproduced 2026-10-01, which confirmed it exited 1 with no output file
+rather than degrading. **Fixed:** commit `a9813b8`, "guard every integer cast that reads a
+document value" — `docmd:ilvl`, the `is-ordered` level predicate and `w:gridSpan` each fall back
+instead of raising. **Verified:** the 2026-10-15 audit above, where every sampled document
+converted without throwing.
+
+The account below is the defect as it stood.
 
 `docmd:ilvl` does `xs:integer(($p/w:pPr/w:numPr/w:ilvl/@w:val, '0')[1])`. An attribute present
 but not a number (`w:val="one"`, or empty) is a cast failure, which propagates out of

@@ -285,13 +285,30 @@ public sealed class TextCoverageTests : IDisposable
         => await AssertNoTextLost(
             Path.Combine(AppContext.BaseDirectory, "fixtures", "real", "sample.docx"));
 
+    /// <summary>
+    /// The extensions the converter accepts, so the audit measures what the product supports
+    /// rather than the one extension it used to glob. A <c>~$</c> prefix is Word's own lock
+    /// file -- ownership metadata, never a readable package.
+    /// </summary>
+    private static readonly string[] WordExtensions = [".docx", ".docm", ".dotx", ".dotm"];
+
+    private static bool IsWordDocument(string path) =>
+        !Path.GetFileName(path).StartsWith("~$", StringComparison.Ordinal)
+        && WordExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Audits a folder of real documents. Opt in with DOCMD_CORPUS.</summary>
     /// <remarks>
-    /// Reports rather than gates. On the 49-document sample it was built against, 43 lose
-    /// nothing and total loss is twelve words, under 0.01% of all text; the causes are recorded
-    /// in docs/limitations.md. Asserting zero here would be a test that cannot pass, which decays
-    /// into one nobody runs. Its one hard assertion is that no document throws, because an
-    /// exception ends a batch run.
+    /// Reports rather than gates. Measured 2026-10-15 on 0.3.0 against corpus
+    /// <c>394b2cb31e7459a1</c>: 45 of 49 documents lose nothing, and total loss is 21 words of
+    /// 245,034, every cause of it recorded in docs/limitations.md. Asserting zero here would be
+    /// a test that cannot pass, which decays into one nobody runs.
+    /// <para>
+    /// Its one hard assertion is that no document throws, because an exception ends a batch run.
+    /// A file that is not an OPC package at all is the exception to that: it is reported
+    /// separately instead, because the CLI calls it input error and exits 2 rather than 1, and a
+    /// real folder of documents usually holds one -- a Word 97-2003 binary someone renamed to
+    /// .docx. Failing the run for it buries everything else the audit found.
+    /// </para>
     /// </remarks>
     [Fact]
     public async Task Corpus_Audit()
@@ -299,14 +316,16 @@ public sealed class TextCoverageTests : IDisposable
         var corpus = Environment.GetEnvironmentVariable("DOCMD_CORPUS");
         Assert.SkipWhen(
             string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus),
-            "Set DOCMD_CORPUS to a folder of .docx files to audit text coverage.");
+            "Set DOCMD_CORPUS to a folder of Word documents to audit text coverage.");
 
-        var documents = Directory.GetFiles(corpus!, "*.docx", SearchOption.AllDirectories)
+        var documents = Directory.GetFiles(corpus!, "*", SearchOption.AllDirectories)
+                                 .Where(IsWordDocument)
                                  .Order(StringComparer.Ordinal).ToArray();
-        documents.Should().NotBeEmpty("DOCMD_CORPUS is set but holds no .docx files");
+        documents.Should().NotBeEmpty("DOCMD_CORPUS is set but holds no Word documents");
 
         var report = new List<string>();
         var threw = new List<string>();
+        var notPackages = new List<string>();
         int clean = 0, lostWords = 0, sourceWords = 0;
 
         foreach (var document in documents)
@@ -335,19 +354,32 @@ public sealed class TextCoverageTests : IDisposable
                            + $"{result.Coverage.SourceWords} words");
                 report.AddRange(TextCoverageReport.Describe(result.Coverage).Skip(1).Take(4));
             }
+            catch (OpcFormatException ex)
+            {
+                // Not a Word package at all: a Word 97-2003 binary carrying a .docx name, a
+                // truncated download, something renamed. The CLI calls this input error and
+                // exits 2 rather than 1, and the audit draws the same line -- a real folder
+                // usually holds one, and failing the run for it buries everything else the
+                // audit found.
+                notPackages.Add($"{Path.GetFileName(document)}: {ex.Message}");
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 threw.Add($"{Path.GetFileName(document)}: {ex.GetType().Name}: {ex.Message}");
             }
         }
 
+        var measured = documents.Length - notPackages.Count - threw.Count;
         var path = Path.Combine(Path.GetTempPath(), "docmd-corpus-audit.txt");
         await File.WriteAllLinesAsync(
             path,
             [
-                $"{clean}/{documents.Length} documents lost no text",
+                $"{clean}/{measured} documents lost no text",
                 $"{lostWords} of {sourceWords} words lost overall",
-                "", .. report, "", "Threw:", .. threw,
+                $"{documents.Length} Word documents found, {notPackages.Count} not a package",
+                "", .. report,
+                "", "Not a Word package:", .. notPackages,
+                "", "Threw:", .. threw,
             ],
             TestContext.Current.CancellationToken);
 

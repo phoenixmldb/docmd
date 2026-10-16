@@ -9,6 +9,38 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+### Changed
+
+- **The corpus audit measures every extension the converter accepts** -- `.docx`, `.docm`,
+  `.dotx` and `.dotm`, and case no longer decides. It globbed `*.docx`, which on Linux matches
+  case-sensitively, so a `.DOCX` or a `.dotx` in an audited folder was quietly left out of the
+  figure rather than counted. Word's own `~$` lock files are skipped, since they are ownership
+  metadata and arrive as fake failures.
+
+  A file that is not an OPC package at all -- a Word 97-2003 binary someone renamed -- is now
+  reported as its own category instead of failing the audit's one hard assertion. That is the
+  line the CLI already draws: input error exits 2, a fault exits 1. Every other exception type
+  still fails the run.
+
+### Documentation
+
+- **The published coverage figures are re-measured on 0.3.0**: 45 of 49 documents lose not one
+  word, and 21 words of 245,034 are lost, against corpus `394b2cb31e7459a1`, measured
+  2026-10-15. `README.md` and `docs/limitations.md` carried the 0.2.0 figure.
+
+  The corpus those older figures were measured against **could not be re-measured**. A corpus id
+  is a hash of its documents' content, so it recognises a corpus and cannot reconstruct one, and
+  the `_source.tsv` that mapped `dca5084324a9022c` was not kept. This is therefore a different
+  corpus, and the two figures are not comparable -- 0.3.0 also changed what the converter does.
+  Both documents now say so, and say to keep the manifest beside the figure.
+
+- **Two limitations that still said "Status: open" are marked fixed**, with the commit and the
+  verification that closed them: the tab-indented code block ([#38]) and the non-numeric
+  `w:ilvl` ([#37]), both shipped in 0.3.0.
+
+[#37]: https://github.com/phoenixmldb/docmd/issues/37
+[#38]: https://github.com/phoenixmldb/docmd/issues/38
+
 ## [0.3.0] — 2026-10-15
 
 A minor bump because **conversion output changes**: a paragraph indented with tabs is no longer
