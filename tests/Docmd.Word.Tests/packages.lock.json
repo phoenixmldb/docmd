@@ -216,13 +216,13 @@
       "docmd.cli": {
         "type": "Project",
         "dependencies": {
-          "Docmd.Word": "[0.2.5, )"
+          "Docmd.Word": "[0.3.0, )"
         }
       },
       "docmd.word": {
         "type": "Project",
         "dependencies": {
-          "Ooxml.Md.Core": "[0.2.5, )",
+          "Ooxml.Md.Core": "[0.3.0, )",
           "PhoenixmlDb.Xslt": "[2.9.0, )"
         }
       },
