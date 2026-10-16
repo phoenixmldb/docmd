@@ -70,35 +70,47 @@ a paragraph.
 ## Measured behaviour
 
 A dated measurement against a **named** corpus, not a running total: 50 real business documents,
-measured 2026-09-14 on docmd 0.2.0 against corpus `dca5084324a9022c`.
+measured 2026-10-15 on docmd 0.3.0 against corpus `394b2cb31e7459a1`.
 
 | | |
 |---|---|
-| Converted without error | **50 of 50** |
-| Lost not one word | **27** |
-| Total words lost | **134** of ~51,800 — 0.26% |
-| Worst single document | 61 words (97.3% kept) |
-| 1,000-paragraph document | ~20 s |
-| 11,000-paragraph document | ~5 min |
+| Converted without error | **49 of 49** Word documents |
+| Lost not one word | **45** |
+| Total words lost | **21** of 245,034 — 0.009% |
+| Worst single document | 11 words (99.8% kept) |
+| Worst proportion | 2 of 177 words (98.9% kept) |
+| Not a Word document at all | 1 of the 50 sampled files — a Word 97-2003 binary carrying a `.docx` name |
+
+The 50th file is counted and named rather than quietly dropped: it is reported as "not a Word
+package", with the message telling the caller to re-save it, and it is excluded from the
+denominator because nothing was measured on it.
+
+Conversion cost: a 1,000-paragraph document converts in about 20 s and an 11,000-paragraph one in
+about 5 min, both measured on 0.2.0 and re-stated rather than re-measured here. This run timed the
+corpus as a whole — 13 m 44 s for 245,034 words — not document by document.
 
 That corpus id is a hash of the documents' content, produced by
 [`scripts/verify-corpus.sh`](scripts/verify-corpus.sh). Quoting it is the point: a later run can
-prove it measured the same documents rather than merely the same number of them. The previous
-record of a corpus was a list of filenames, and by the time these figures needed re-running,
-20 of its 21 names no longer resolved to a file.
+prove it measured the same documents rather than merely the same number of them.
 
-**These numbers are not comparable to 0.1.0's** (`43 of 49`, 12 words). Both the documents and
-the measurement changed, so the difference between them measures nothing. The oracle now counts
-`w:noBreakHyphen` and `w:sym`, which it previously could not see — so it reports losses the old
-one was structurally unable to detect. The conversion got better in 0.2.0; the reporting got
-honest.
+**The corpus behind the earlier figures is gone, and that is the second time.** The record before
+`verify-corpus.sh` existed was a list of filenames, and by the time those figures needed
+re-running, 20 of its 21 names no longer resolved to a file. `dca5084324a9022c` was recorded by
+content hash instead, which was the fix — and it could not be re-measured either, because the
+`_source.tsv` carrying those hashes was not kept anywhere. An id *recognises* a corpus; it cannot
+reconstruct one. Keep the manifest beside the figure, or the figure expires with the directory.
+
+**These numbers are not comparable to 0.2.0's** (`27 of 50`, 134 words of ~51,800). Different
+documents and a different converter: 0.3.0 stopped turning a tab-indented paragraph into a code
+block, worth 17 words on one document of the earlier corpus by itself. Neither figure is a
+baseline for the other, and the gap between them measures nothing.
 
 docmd checks this on every conversion, not just under test: it compares the words a reader can
 see in the `.docx` against the words a Markdown parser recovers from the output, and reports any
 that did not survive. Silent when nothing was lost.
 
-[`docs/limitations.md`](docs/limitations.md) is the canonical account — what the twelve words
-were, what causes each remaining loss, and where conversion cost stops being linear.
+[`docs/limitations.md`](docs/limitations.md) is the canonical account — what each remaining loss
+is, what causes it, and where conversion cost stops being linear.
 
 Those figures come from documents we are allowed to read. **CI does not reproduce them**, and
 cannot: the corpus is client work and is not in this repository. So the measurement is a dated
