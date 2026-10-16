@@ -9,6 +9,17 @@ stylesheet writes against is not stable until `1.0`.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-10-15
+
+A minor bump because **conversion output changes**: a paragraph indented with tabs is no longer
+turned into a code block, and an interrupted numbered list keeps its numbering.
+
+It also **answers a high-severity advisory against the engine 0.2.5 shipped**
+(`GHSA-5697-c8qg-472f`, patched in `PhoenixmlDb.Xslt` 2.8.0), and it bounds a stylesheet passed
+with `--stylesheet`: every transform now runs under a regular-expression time limit and a
+resource policy. A stylesheet that read files outside its own directory is refused where it was
+allowed before, which is the one way this release can break a working command.
+
 ### Added
 
 - **`--regex-timeout <seconds>`** -- how long any one regular expression in a stylesheet may run.
@@ -42,6 +53,24 @@ stylesheet writes against is not stable until `1.0`.
   A blown limit or a refused read exits **2**, the usage code, rather than 1 -- a stylesheet the
   caller passed is input, and a CI script has to be able to tell that from an internal fault.
   Eleven cases pin this, the backtracking pattern from the report among them.
+
+- **A non-numeric `w:ilvl` no longer aborts the conversion**
+  ([#37](https://github.com/phoenixmldb/docmd/issues/37)). Every integer cast that reads a
+  document value is guarded: `docmd:ilvl`, the `is-ordered` level predicate and `w:gridSpan`
+  each fall back instead of raising a dynamic error. One malformed document could previously
+  exit 1 and write nothing, which in a batch lost the document rather than degrading it.
+
+- **Four or more leading tabs no longer turn a paragraph into a code block**
+  ([#38](https://github.com/phoenixmldb/docmd/issues/38)). This was text loss, not a cosmetic
+  slip: on one corpus document the coverage oracle's lost-word count fell from 17 to 4. The
+  serialiser now trims the leading whitespace of a block's first physical line when it reaches
+  4 columns, which is CommonMark's indented-code threshold, and leaves 1 to 3 alone.
+
+- **An interrupted ordered list continues its numbering**
+  ([#39](https://github.com/phoenixmldb/docmd/issues/39)). A numbered procedure broken by a note
+  paragraph restarted at `1.`. `build-list` now counts the preceding items of the same `w:numId`
+  at level 0 and emits `md:list/@start`, which the vocabulary already defined and the serialiser
+  already read.
 
 ### Changed
 
@@ -133,27 +162,6 @@ stylesheet writes against is not stable until `1.0`.
   the schema-typing explanation offered for it. Setting `SchemaProvider` to null before
   compiling changes neither the time (eight interleaved arms all inside a 1.3% band) nor the
   output (byte-identical in every arm).
-
-
-### Fixed
-
-- **A non-numeric `w:ilvl` no longer aborts the conversion**
-  ([#37](https://github.com/phoenixmldb/docmd/issues/37)). Every integer cast that reads a
-  document value is guarded: `docmd:ilvl`, the `is-ordered` level predicate and `w:gridSpan`
-  each fall back instead of raising a dynamic error. One malformed document could previously
-  exit 1 and write nothing, which in a batch lost the document rather than degrading it.
-
-- **Four or more leading tabs no longer turn a paragraph into a code block**
-  ([#38](https://github.com/phoenixmldb/docmd/issues/38)). This was text loss, not a cosmetic
-  slip: on one corpus document the coverage oracle's lost-word count fell from 17 to 4. The
-  serialiser now trims the leading whitespace of a block's first physical line when it reaches
-  4 columns, which is CommonMark's indented-code threshold, and leaves 1 to 3 alone.
-
-- **An interrupted ordered list continues its numbering**
-  ([#39](https://github.com/phoenixmldb/docmd/issues/39)). A numbered procedure broken by a note
-  paragraph restarted at `1.`. `build-list` now counts the preceding items of the same `w:numId`
-  at level 0 and emits `md:list/@start`, which the vocabulary already defined and the serialiser
-  already read.
 
 ## [0.2.5] — 2026-10-02
 
