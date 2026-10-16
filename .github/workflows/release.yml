@@ -58,10 +58,19 @@ jobs:
       # removing that failure mode elsewhere. A 404 on the index is NOT that: it means the
       # package has never been published, which is the correct state for a first release.
       #
-      # Known window: the flat-container listing lags a push by a few minutes (measured at
-      # roughly four for 0.2.5), so re-tagging within that window would still slip through.
-      # That is a narrower hole than the one this closes, and closing it completely would mean
-      # trusting an index that is slower still.
+      # Known window: the flat-container listing lags a push, so re-tagging inside that window
+      # would still slip through. Measured twice, and it is wider than the first measurement
+      # suggested -- roughly four minutes for 0.2.5, and 400 seconds for 0.3.0. Treat it as ten
+      # minutes rather than four.
+      #
+      # The registration and search services lag the flat container again, by more than the
+      # flat container lags the push: at the moment this index first listed 0.3.0,
+      # `dotnet tool install --version 0.3.0` still answered "not found in NuGet feeds". So a
+      # fresh install is the slower signal, not the earlier one, and it cannot be the gate
+      # either.
+      #
+      # That window is still a narrower hole than the one this closes, and closing it
+      # completely would mean trusting an index that is slower still.
       - name: Version is not already published
         if: startsWith(github.ref, 'refs/tags/v') && inputs.dry-run != true
         env:
