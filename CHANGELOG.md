@@ -105,7 +105,8 @@ stylesheet writes against is not stable until `1.0`.
   at 1,000 ms, on both versions. The lever that stops it is `XsltTransformer.RegexMatchTimeout`,
   which bounded the same pattern at 2,013 ms with a diagnostic naming the expression; docmd
   sets no timeout. Tracked separately -- it is docmd's gap on every engine version, not
-  something a pin bump fixes.
+  something a pin bump fixes. **Fixed since**, under *Fixed* above: every transform now sets
+  the limit, and a caller's stylesheet runs under a resource policy as well.
 
   **Performance: about 4% faster than the shipped 2.5.1, with no reliable difference against
   2.6.0.** Measured on the largest corpus document, 6,282 paragraphs, each engine built into
