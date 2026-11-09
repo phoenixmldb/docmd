@@ -28,6 +28,6 @@
          Do not bump without a licensing decision. -->
     <PackageVersion Include="FluentAssertions" Version="6.12.2" />
     <!-- Test-only: differential oracle for the Markdown serialiser (Task 7). -->
-    <PackageVersion Include="Markdig" Version="1.3.2" />
+    <PackageVersion Include="Markdig" Version="1.6.0" />
   </ItemGroup>
 </Project>
