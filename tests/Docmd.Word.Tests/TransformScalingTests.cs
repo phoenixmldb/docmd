@@ -89,7 +89,14 @@ public sealed class TransformScalingTests
             () => MarkdownTransform.RunAsync(composite, TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        if (await Task.WhenAny(work, Task.Delay(Budget)).ConfigureAwait(false) != work)
+        bool finished;
+        using (var budget = new CancellationTokenSource())
+        {
+            finished = await Task.WhenAny(work, Task.Delay(Budget, budget.Token)).ConfigureAwait(false) == work;
+            await budget.CancelAsync().ConfigureAwait(false);
+        }
+
+        if (!finished)
         {
             Assert.Fail(
                 $"Transforming {paragraphs} paragraphs of plain text exceeded {Budget / 1000}s "
