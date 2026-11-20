@@ -17,6 +17,15 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <AnalysisLevel>latest-all</AnalysisLevel>
   </PropertyGroup>
+
+  <!-- .NET 11 gives string's char methods (StartsWith, EndsWith, IndexOf, LastIndexOf) a
+       StringComparison overload, so CA1307 starts to report every char call in the net11.0
+       build. A char comparison is ordinal; there is no culture to make explicit. The same
+       sources are analyzed for net10.0, where CA1307 still checks the string overloads that
+       do take a culture. Remove this when net10.0 is no longer a target. -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net11.0'">
+    <NoWarn>$(NoWarn);CA1307</NoWarn>
+  </PropertyGroup>
   <PropertyGroup>
     <!--
       One version for the whole product. 0.x is deliberate: docmd converts real documents well
