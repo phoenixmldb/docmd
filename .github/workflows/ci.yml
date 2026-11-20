@@ -93,11 +93,15 @@ jobs:
 
       # Proves the tool actually runs, which building a library does not. A packaging or
       # embedded-resource mistake shows up here and nowhere else in this job.
+      # Both builds the tool ships; dotnet run needs --framework once the CLI has two targets.
       - name: Smoke test the CLI
         run: |
-          dotnet run --project src/Docmd.Cli --no-build -c Release -- --version
-          dotnet run --project src/Docmd.Cli --no-build -c Release -- --print-stylesheet \
-            | python3 -c "import sys,xml.parsers.expat; p=xml.parsers.expat.ParserCreate(); p.Parse(sys.stdin.buffer.read(),True); print('embedded stylesheet parses')"
+          for tfm in net10.0 net11.0; do
+            echo "== $tfm"
+            dotnet run --project src/Docmd.Cli --no-build -c Release -f "$tfm" -- --version
+            dotnet run --project src/Docmd.Cli --no-build -c Release -f "$tfm" -- --print-stylesheet \
+              | python3 -c "import sys,xml.parsers.expat; p=xml.parsers.expat.ParserCreate(); p.Parse(sys.stdin.buffer.read(),True); print('embedded stylesheet parses')"
+          done
 
   # The same build and tests on SDK 10. global.json pins SDK 11; this job repoints it, so the
   # projects build net10.0 alone (Directory.Build.props adds net11.0 only on SDK 11). It proves
